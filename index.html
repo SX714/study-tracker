@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>儀表板 — Study Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 導覽列 -->
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">
+      <span class="brand-icon">📚</span> Study Tracker
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
+      <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
+      <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
+      <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
+    </ul>
+    <button class="nav-hamburger" aria-label="選單">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <!-- 主內容 -->
+  <main>
+    <!-- 頁面標題 -->
+    <div class="page-header">
+      <div>
+        <h1>🏠 今日學習總覽</h1>
+        <p id="today-date" class="text-muted"></p>
+      </div>
+      <a href="timer.html" class="btn btn-primary">
+        ⏱️ 開始計時
+      </a>
+    </div>
+
+    <!-- 摘要卡片 -->
+    <div class="summary-grid">
+      <div class="card">
+        <div class="card-title">今日學習時數</div>
+        <div class="card-value" id="today-minutes">0m</div>
+        <div class="card-sub">本日累計</div>
+      </div>
+      <div class="card">
+        <div class="card-title">本週學習時數</div>
+        <div class="card-value" id="week-minutes">0m</div>
+        <div class="card-sub">本週累計</div>
+      </div>
+      <div class="card">
+        <div class="card-title">完成番茄數</div>
+        <div class="card-value" id="pomodoro-count">0</div>
+        <div class="card-sub">今日完成</div>
+      </div>
+      <div class="card">
+        <div class="card-title">目標達成率</div>
+        <div class="card-value" id="goal-rate">—</div>
+        <div class="card-sub">進行中目標</div>
+      </div>
+    </div>
+
+    <!-- 快速啟動計時器 -->
+    <div class="card mb-24">
+      <div class="card-title">⚡ 快速啟動</div>
+      <div class="flex gap-12 mt-8" style="flex-wrap:wrap; align-items:center;">
+        <select class="form-select" id="quick-subject" style="max-width:200px;">
+          <option value="">選擇科目…</option>
+        </select>
+        <a href="timer.html" class="btn btn-primary" id="quick-start-btn">
+          ▶ 開始番茄鐘
+        </a>
+        <a href="timer.html" class="btn btn-ghost" id="quick-free-btn">
+          ⏱ 自由計時
+        </a>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <!-- 近期記錄 -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:0">📋 近期學習記錄</div>
+          <a href="stats.html" style="font-size:0.8rem; color:var(--accent);">查看全部</a>
+        </div>
+        <div id="recent-sessions">
+          <div class="empty-state" style="padding:24px 0;">
+            <div class="empty-icon">📭</div>
+            <p>尚無學習記錄，<a href="timer.html">開始第一次計時</a>！</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 進行中目標 -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:0">🎯 進行中目標</div>
+          <a href="goals.html" style="font-size:0.8rem; color:var(--accent);">管理目標</a>
+        </div>
+        <div id="active-goals">
+          <div class="empty-state" style="padding:24px 0;">
+            <div class="empty-icon">🎯</div>
+            <p>尚無目標，<a href="goals.html">立即新增</a>！</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>© 2025 Study Tracker — 純前端學習追蹤工具</footer>
+
+  <!-- AI 浮鈕 -->
+  <button class="ai-fab" id="ai-fab-btn" title="AI 學習助理">💬</button>
+
+  <script src="js/utils.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 顯示今日日期
+      document.getElementById('today-date').textContent =
+        new Date().toLocaleDateString('zh-TW', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+
+      const today = toDateStr();
+      const { start: wStart, end: wEnd } = getThisWeekRange();
+      const sessions = loadData('st_sessions', []);
+
+      // 今日時數
+      const todaySessions = sessions.filter(s => s.startAt.startsWith(today));
+      document.getElementById('today-minutes').textContent =
+        formatMinutes(todaySessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0));
+
+      // 本週時數
+      const weekSessions = sessions.filter(s => isInRange(s.startAt.slice(0,10), wStart, wEnd));
+      document.getElementById('week-minutes').textContent =
+        formatMinutes(weekSessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0));
+
+      // 今日番茄數
+      document.getElementById('pomodoro-count').textContent =
+        todaySessions.filter(s => s.mode === 'pomodoro' && s.completed).length;
+
+      // 快速啟動下拉選單
+      const subjects = loadData('st_subjects', []);
+      const sel = document.getElementById('quick-subject');
+      subjects.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = `${s.emoji || ''} ${s.name}`;
+        sel.appendChild(opt);
+      });
+
+      // 快速啟動連結帶科目參數
+      sel.addEventListener('change', () => {
+        const id = sel.value;
+        document.getElementById('quick-start-btn').href =
+          id ? `timer.html?subject=${id}&mode=pomodoro` : 'timer.html';
+        document.getElementById('quick-free-btn').href =
+          id ? `timer.html?subject=${id}&mode=free` : 'timer.html';
+      });
+
+      // 近期記錄（最近 5 筆）
+      const recentEl = document.getElementById('recent-sessions');
+      if (sessions.length > 0) {
+        const recent = [...sessions].reverse().slice(0, 5);
+        const subMap = Object.fromEntries(subjects.map(s => [s.id, s]));
+        recentEl.innerHTML = recent.map(s => {
+          const sub = subMap[s.subjectId];
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center;
+                        padding:8px 0; border-bottom:1px solid var(--border);">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:1.1rem">${sub?.emoji || '📝'}</span>
+                <span style="font-size:0.88rem">${sub?.name || '未知科目'}</span>
+                <span class="badge badge-${s.mode === 'pomodoro' ? 'blue' : 'gray'}">
+                  ${s.mode === 'pomodoro' ? '🍅 番茄' : '⏱ 自由'}
+                </span>
+              </div>
+              <span style="font-size:0.82rem; color:var(--text-muted);">
+                ${formatMinutes(s.durationMinutes || 0)} · ${formatDate(s.startAt)}
+              </span>
+            </div>`;
+        }).join('');
+      }
+
+      // 進行中目標
+      const goals = loadData('st_goals', []);
+      const today2 = toDateStr();
+      const activeGoals = goals.filter(g => g.endDate >= today2);
+      const goalsEl = document.getElementById('active-goals');
+      if (activeGoals.length > 0) {
+        goalsEl.innerHTML = activeGoals.slice(0, 3).map(g => {
+          const subName = g.subjectId
+            ? (subjects.find(s => s.id === g.subjectId)?.name || '未知')
+            : '所有科目';
+          const done = sessions
+            .filter(s => isInRange(s.startAt.slice(0,10), g.startDate, g.endDate)
+              && (!g.subjectId || s.subjectId === g.subjectId))
+            .reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+          const pct = Math.min(100, Math.round((done / g.targetMinutes) * 100));
+          return `
+            <div style="margin-bottom:14px;">
+              <div style="display:flex; justify-content:space-between; font-size:0.88rem; margin-bottom:4px;">
+                <span><strong>${g.title}</strong>
+                  <span class="badge badge-gray" style="margin-left:4px;">${subName}</span></span>
+                <span style="color:var(--text-muted);">${pct}%</span>
+              </div>
+              <div class="progress-wrap">
+                <div class="progress-fill ${pct >= 100 ? 'success' : pct >= 60 ? '' : 'warning'}"
+                     style="width:${pct}%"></div>
+              </div>
+              <div style="font-size:0.78rem; color:var(--text-muted); margin-top:3px;">
+                ${formatMinutes(done)} / ${formatMinutes(g.targetMinutes)}
+              </div>
+            </div>`;
+        }).join('');
+      }
+
+      // 目標達成率
+      if (activeGoals.length > 0) {
+        const rates = activeGoals.map(g => {
+          const done = sessions
+            .filter(s => isInRange(s.startAt.slice(0,10), g.startDate, g.endDate)
+              && (!g.subjectId || s.subjectId === g.subjectId))
+            .reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+          return Math.min(100, Math.round((done / g.targetMinutes) * 100));
+        });
+        const avg = Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
+        document.getElementById('goal-rate').textContent = `${avg}%`;
+      }
+    });
+  </script>
+</body>
+</html>

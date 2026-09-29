@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>計時器 — Study Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .timer-container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .mode-tabs {
+      display: flex;
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .mode-tab {
+      flex: 1;
+      padding: 9px;
+      text-align: center;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      transition: background var(--transition), color var(--transition);
+      border: none;
+      background: none;
+    }
+    .mode-tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .timer-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 36px 28px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .timer-phase-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+    .timer-display {
+      font-size: 5rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: var(--primary);
+      line-height: 1;
+      margin-bottom: 24px;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer-controls {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .pomodoro-dots {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 16px 0;
+    }
+    .pomodoro-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.2s;
+    }
+    .pomodoro-dot.done { background: var(--accent); }
+    .pomodoro-dot.current { background: var(--warning); }
+    .session-log { margin-top: 20px; }
+    .session-log-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">
+      <span class="brand-icon">📚</span> Study Tracker
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
+      <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
+      <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
+      <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
+    </ul>
+    <button class="nav-hamburger" aria-label="選單">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <main>
+    <div class="page-header">
+      <div>
+        <h1>⏱️ 專注計時器</h1>
+        <p class="text-muted">番茄鐘或自由計時，開始累積學習時數</p>
+      </div>
+    </div>
+
+    <div class="timer-container">
+      <!-- 模式切換 -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="pomodoro">🍅 番茄鐘</button>
+        <button class="mode-tab" data-mode="free">⏱ 自由計時</button>
+      </div>
+
+      <!-- 科目選擇 -->
+      <div class="form-group mb-24">
+        <label class="form-label">選擇學習科目 *</label>
+        <select class="form-select" id="subject-select">
+          <option value="">— 請選擇科目 —</option>
+        </select>
+      </div>
+
+      <!-- 計時器主畫面 -->
+      <div class="timer-card">
+        <div class="timer-phase-label" id="phase-label">專注時間</div>
+        <div class="timer-display" id="timer-display">25:00</div>
+
+        <!-- 番茄進度點（番茄鐘模式用）-->
+        <div class="pomodoro-dots" id="pomodoro-dots">
+          <div class="pomodoro-dot" data-index="0"></div>
+          <div class="pomodoro-dot" data-index="1"></div>
+          <div class="pomodoro-dot" data-index="2"></div>
+          <div class="pomodoro-dot" data-index="3"></div>
+        </div>
+
+        <div class="timer-controls">
+          <button class="btn btn-primary btn-lg" id="start-btn">▶ 開始</button>
+          <button class="btn btn-ghost btn-lg" id="reset-btn">↺ 重置</button>
+        </div>
+      </div>
+
+      <!-- 本次記錄 -->
+      <div class="session-log" id="session-log">
+        <div class="card-title mb-16">📋 本次工作階段</div>
+        <div id="session-log-list">
+          <p style="font-size:0.85rem; color:var(--text-muted);">尚無完成記錄</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>© 2025 Study Tracker — 純前端學習追蹤工具</footer>
+  <button class="ai-fab" id="ai-fab-btn" title="AI 學習助理">💬</button>
+
+  <script src="js/utils.js"></script>
+  <script>
+    // 設定讀取
+    const settings = loadData('st_settings', {
+      pomodoroMinutes: 25, shortBreakMinutes: 5,
+      longBreakMinutes: 15, longBreakInterval: 4
+    });
+
+    const PHASES = {
+      work:       { label: '🍅 專注時間', minutes: settings.pomodoroMinutes },
+      shortBreak: { label: '☕ 短休息',   minutes: settings.shortBreakMinutes },
+      longBreak:  { label: '🛌 長休息',   minutes: settings.longBreakMinutes }
+    };
+
+    let mode        = 'pomodoro'; // 'pomodoro' | 'free'
+    let phase       = 'work';     // 'work' | 'shortBreak' | 'longBreak'
+    let running     = false;
+    let intervalId  = null;
+    let remaining   = PHASES.work.minutes * 60; // 秒
+    let elapsed     = 0;   // 自由計時用（秒）
+    let pomodoroRound = 0; // 已完成的番茄數（0-3）
+    let sessionStart  = null;
+    const sessionLog  = [];
+
+    // 載入科目
+    const subjects = loadData('st_subjects', []);
+    const sel = document.getElementById('subject-select');
+    subjects.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = `${s.emoji || ''} ${s.name}`;
+      sel.appendChild(opt);
+    });
+
+    // URL 參數預選
+    const params = new URLSearchParams(location.search);
+    if (params.get('subject')) sel.value = params.get('subject');
+    if (params.get('mode') === 'free') switchMode('free');
+
+    // 模式切換 Tab
+    document.querySelectorAll('.mode-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchMode(tab.dataset.mode));
+    });
+
+    function switchMode(m) {
+      mode = m;
+      document.querySelectorAll('.mode-tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.mode === m));
+      resetTimer();
+      document.getElementById('pomodoro-dots').style.display =
+        m === 'pomodoro' ? 'flex' : 'none';
+      if (m === 'free') {
+        document.getElementById('phase-label').textContent = '⏱ 自由計時';
+        document.getElementById('timer-display').textContent = '00:00';
+      }
+    }
+
+    function updateDisplay() {
+      const secs = mode === 'free' ? elapsed : remaining;
+      const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+      const ss = String(secs % 60).padStart(2, '0');
+      document.getElementById('timer-display').textContent = `${mm}:${ss}`;
+    }
+
+    function updateDots() {
+      document.querySelectorAll('.pomodoro-dot').forEach((dot, i) => {
+        dot.classList.remove('done', 'current');
+        if (i < pomodoroRound) dot.classList.add('done');
+        else if (i === pomodoroRound && phase === 'work') dot.classList.add('current');
+      });
+    }
+
+    function startTimer() {
+      if (!sel.value) { alert('請先選擇學習科目！'); return; }
+      running = true;
+      sessionStart = sessionStart || new Date();
+      document.getElementById('start-btn').textContent = '⏸ 暫停';
+      document.getElementById('start-btn').classList.replace('btn-primary', 'btn-warning');
+
+      intervalId = setInterval(() => {
+        if (mode === 'free') {
+          elapsed++;
+        } else {
+          remaining--;
+          if (remaining <= 0) {
+            clearInterval(intervalId);
+            onPomodoroPhaseEnd();
+            return;
+          }
+        }
+        updateDisplay();
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      running = false;
+      clearInterval(intervalId);
+      document.getElementById('start-btn').textContent = '▶ 繼續';
+      document.getElementById('start-btn').classList.replace('btn-warning', 'btn-primary');
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      elapsed = 0;
+      remaining = PHASES[phase].minutes * 60;
+      sessionStart = null;
+      document.getElementById('start-btn').textContent = '▶ 開始';
+      document.getElementById('start-btn').classList.remove('btn-warning');
+      document.getElementById('start-btn').classList.add('btn-primary');
+      updateDisplay();
+    }
+
+    function onPomodoroPhaseEnd() {
+      if (phase === 'work') {
+        saveSession(settings.pomodoroMinutes, true);
+        pomodoroRound++;
+        if (pomodoroRound >= settings.longBreakInterval) {
+          pomodoroRound = 0;
+          phase = 'longBreak';
+        } else {
+          phase = 'shortBreak';
+        }
+      } else {
+        phase = 'work';
+      }
+      remaining = PHASES[phase].minutes * 60;
+      document.getElementById('phase-label').textContent = PHASES[phase].label;
+      updateDisplay();
+      updateDots();
+      notifyUser(PHASES[phase].label);
+      sessionStart = new Date();
+      startTimer();
+    }
+
+    function saveSession(durationMinutes, completed) {
+      const subjectId = sel.value;
+      if (!subjectId || durationMinutes < 1) return;
+      const session = {
+        id: generateId(), subjectId, mode,
+        startAt: (sessionStart || new Date()).toISOString(),
+        durationMinutes, completed
+      };
+      const sessions = loadData('st_sessions', []);
+      sessions.push(session);
+      saveData('st_sessions', sessions);
+
+      const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
+      sessionLog.push({ subName, durationMinutes, mode, completed });
+      renderSessionLog();
+    }
+
+    function renderSessionLog() {
+      const el = document.getElementById('session-log-list');
+      if (sessionLog.length === 0) {
+        el.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">尚無完成記錄</p>';
+        return;
+      }
+      el.innerHTML = sessionLog.map(s => `
+        <div class="session-log-item">
+          <span>${s.mode === 'pomodoro' ? '🍅' : '⏱'} ${s.subName}</span>
+          <span class="badge badge-${s.completed ? 'green' : 'gray'}">
+            ${formatMinutes(s.durationMinutes)}
+          </span>
+        </div>`).join('');
+    }
+
+    function notifyUser(nextPhase) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Study Tracker', { body: `下一階段：${nextPhase}`, icon: '📚' });
+      }
+    }
+
+    // 請求通知權限
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    // 按鈕事件
+    document.getElementById('start-btn').addEventListener('click', () => {
+      running ? pauseTimer() : startTimer();
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      if (mode === 'free' && elapsed > 0) {
+        if (confirm('確定要重置？目前計時將儲存為一筆記錄。')) {
+          saveSession(Math.floor(elapsed / 60), false);
+          resetTimer();
+        }
+      } else {
+        resetTimer();
+      }
+    });
+
+    // 初始化
+    updateDisplay();
+    updateDots();
+  </script>
+</body>
+</html>

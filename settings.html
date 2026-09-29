@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>設定 — Study Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .settings-section {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .settings-section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .key-input-wrap {
+      position: relative;
+    }
+    .key-input-wrap .form-input {
+      padding-right: 44px;
+    }
+    .key-toggle {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      color: var(--text-muted);
+    }
+    .test-result {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      display: none;
+    }
+    .test-result.success {
+      background: #dcfce7; color: #15803d; display: block;
+    }
+    .test-result.error {
+      background: #fee2e2; color: #b91c1c; display: block;
+    }
+    @media (max-width: 600px) {
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">
+      <span class="brand-icon">📚</span> Study Tracker
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
+      <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
+      <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
+      <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
+    </ul>
+    <button class="nav-hamburger" aria-label="選單">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <main style="max-width: 640px;">
+    <div class="page-header">
+      <div>
+        <h1>⚙️ 設定</h1>
+        <p class="text-muted">管理 AI 金鑰與計時器預設值</p>
+      </div>
+    </div>
+
+    <!-- AI 設定 -->
+    <div class="settings-section">
+      <div class="settings-section-title">🤖 Gemini AI 設定</div>
+
+      <div class="form-group">
+        <label class="form-label">Gemini API Key</label>
+        <div class="key-input-wrap">
+          <input type="password" class="form-input" id="api-key"
+                 placeholder="AIza…（從 Google AI Studio 取得）">
+          <button class="key-toggle" id="key-toggle" type="button" title="顯示／隱藏">👁</button>
+        </div>
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">
+          Key 僅儲存於你的瀏覽器 localStorage，不會傳送至任何伺服器。
+          前往 <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> 取得免費 Key。
+        </p>
+      </div>
+
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="btn btn-primary" id="save-key-btn">💾 儲存 Key</button>
+        <button class="btn btn-ghost" id="test-key-btn">🔌 測試連線</button>
+        <button class="btn btn-ghost" id="clear-key-btn" style="color:var(--danger);">🗑 清除</button>
+      </div>
+
+      <div class="test-result" id="test-result"></div>
+    </div>
+
+    <!-- 計時器設定 -->
+    <div class="settings-section">
+      <div class="settings-section-title">⏱️ 番茄鐘預設值</div>
+      <div class="settings-grid">
+        <div class="form-group">
+          <label class="form-label">番茄鐘時長（分鐘）</label>
+          <input type="number" class="form-input" id="s-pomodoro" min="1" max="120" value="25">
+        </div>
+        <div class="form-group">
+          <label class="form-label">短休息時長（分鐘）</label>
+          <input type="number" class="form-input" id="s-short" min="1" max="30" value="5">
+        </div>
+        <div class="form-group">
+          <label class="form-label">長休息時長（分鐘）</label>
+          <input type="number" class="form-input" id="s-long" min="5" max="60" value="15">
+        </div>
+        <div class="form-group">
+          <label class="form-label">長休息間隔（每幾輪後）</label>
+          <input type="number" class="form-input" id="s-interval" min="2" max="8" value="4">
+        </div>
+      </div>
+      <button class="btn btn-primary mt-8" id="save-timer-btn">💾 儲存設定</button>
+    </div>
+
+    <!-- 資料管理 -->
+    <div class="settings-section">
+      <div class="settings-section-title">🗂 資料管理</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        所有資料儲存於本機瀏覽器 localStorage。清除後無法復原，請謹慎操作。
+      </p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-ghost" id="export-btn">📤 匯出資料（JSON）</button>
+        <button class="btn btn-ghost btn-sm" id="clear-sessions-btn"
+                style="color:var(--danger);">🗑 清除學習記錄</button>
+        <button class="btn btn-ghost btn-sm" id="clear-all-btn"
+                style="color:var(--danger);">⚠️ 清除所有資料</button>
+      </div>
+    </div>
+  </main>
+
+  <footer>© 2025 Study Tracker — 純前端學習追蹤工具</footer>
+  <button class="ai-fab" id="ai-fab-btn" title="AI 學習助理">💬</button>
+
+  <script src="js/utils.js"></script>
+  <script>
+    // 載入現有設定
+    const settings = loadData('st_settings', {
+      pomodoroMinutes: 25, shortBreakMinutes: 5,
+      longBreakMinutes: 15, longBreakInterval: 4, geminiApiKey: ''
+    });
+    document.getElementById('api-key').value       = settings.geminiApiKey || '';
+    document.getElementById('s-pomodoro').value    = settings.pomodoroMinutes || 25;
+    document.getElementById('s-short').value       = settings.shortBreakMinutes || 5;
+    document.getElementById('s-long').value        = settings.longBreakMinutes || 15;
+    document.getElementById('s-interval').value    = settings.longBreakInterval || 4;
+
+    // 顯示/隱藏 Key
+    document.getElementById('key-toggle').addEventListener('click', () => {
+      const inp = document.getElementById('api-key');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
+
+    // 儲存 Key
+    document.getElementById('save-key-btn').addEventListener('click', () => {
+      const key = document.getElementById('api-key').value.trim();
+      const s   = loadData('st_settings', {});
+      s.geminiApiKey = key;
+      saveData('st_settings', s);
+      showResult('success', '✅ API Key 已儲存');
+    });
+
+    // 清除 Key
+    document.getElementById('clear-key-btn').addEventListener('click', () => {
+      document.getElementById('api-key').value = '';
+      const s = loadData('st_settings', {});
+      s.geminiApiKey = '';
+      saveData('st_settings', s);
+      showResult('success', '🗑 API Key 已清除');
+    });
+
+    // 測試連線
+    document.getElementById('test-key-btn').addEventListener('click', async () => {
+      const key = document.getElementById('api-key').value.trim();
+      if (!key) { showResult('error', '❌ 請先輸入 API Key'); return; }
+      showResult('', '🔄 測試中…');
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+          { method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ role:'user', parts:[{ text:'hi' }] }] }) }
+        );
+        if (res.ok) showResult('success', '✅ 連線成功！Gemini API Key 有效。');
+        else {
+          const err = await res.json();
+          showResult('error', `❌ 連線失敗：${err.error?.message || res.status}`);
+        }
+      } catch (e) {
+        showResult('error', `❌ 網路錯誤：${e.message}`);
+      }
+    });
+
+    function showResult(type, msg) {
+      const el = document.getElementById('test-result');
+      el.className = `test-result${type ? ' ' + type : ''}`;
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    // 儲存計時器設定
+    document.getElementById('save-timer-btn').addEventListener('click', () => {
+      const s = loadData('st_settings', {});
+      s.pomodoroMinutes   = parseInt(document.getElementById('s-pomodoro').value) || 25;
+      s.shortBreakMinutes = parseInt(document.getElementById('s-short').value)    || 5;
+      s.longBreakMinutes  = parseInt(document.getElementById('s-long').value)     || 15;
+      s.longBreakInterval = parseInt(document.getElementById('s-interval').value) || 4;
+      saveData('st_settings', s);
+      alert('✅ 計時器設定已儲存！');
+    });
+
+    // 匯出資料
+    document.getElementById('export-btn').addEventListener('click', () => {
+      const data = {
+        st_subjects: loadData('st_subjects'),
+        st_sessions: loadData('st_sessions'),
+        st_goals:    loadData('st_goals'),
+        st_settings: { ...loadData('st_settings'), geminiApiKey: '***' }, // 隱藏 Key
+        exportedAt:  new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `study-tracker-backup-${toDateStr()}.json`;
+      a.click();
+    });
+
+    // 清除學習記錄
+    document.getElementById('clear-sessions-btn').addEventListener('click', () => {
+      if (confirm('確定要清除所有學習記錄？此動作無法復原。')) {
+        saveData('st_sessions', []);
+        alert('✅ 學習記錄已清除');
+      }
+    });
+
+    // 清除所有資料
+    document.getElementById('clear-all-btn').addEventListener('click', () => {
+      if (confirm('⚠️ 確定要清除所有資料（科目、記錄、目標）？此動作無法復原！')) {
+        ['st_subjects','st_sessions','st_goals','st_ai_history'].forEach(k =>
+          localStorage.removeItem(k));
+        alert('✅ 所有資料已清除，頁面將重新整理。');
+        location.reload();
+      }
+    });
+  </script>
+</body>
+</html>
