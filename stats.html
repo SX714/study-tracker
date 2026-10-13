@@ -224,8 +224,10 @@
       // 每週趨勢（依週計算）
       const weeklyMap = {};
       sessions.forEach(s => {
-        const d = new Date(s.startAt);
-        const wStart = toDateStr(new Date(d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay()-1))));
+        const d    = new Date(s.startAt);
+        const day  = d.getDay() === 0 ? 6 : d.getDay() - 1; // 週一為起點
+        const mono = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+        const wStart = toDateStr(mono);
         weeklyMap[wStart] = (weeklyMap[wStart] || 0) + (s.durationMinutes || 0);
       });
       const weekLabels = Object.keys(weeklyMap).sort();

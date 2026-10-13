@@ -484,8 +484,8 @@ footer {
   /* 計時器大字縮小 */
   .timer-display { font-size: clamp(3rem, 18vw, 6rem) !important; }
 
-  /* Modal 寬度 100% */
-  .modal-content { margin: 20px 12px; max-height: calc(100dvh - 40px); overflow-y: auto; }
+  /* Modal 手機版：邊距縮小 + 最高度限制 */
+  .modal { margin: 20px 12px; max-height: calc(100dvh - 40px); overflow-y: auto; }
 
   /* Modal / 設定頁 雙欄表單 → 單欄 */
   .form-row-2col  { grid-template-columns: 1fr !important; }
