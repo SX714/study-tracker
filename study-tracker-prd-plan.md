@@ -287,14 +287,16 @@
 **目標：** 在所有頁面注入 AI 聊天浮鈕，透過 Gemini API 提供情境感知問答，並設定 API Key。
 
 **子任務清單：**
-- [ ] `settings.html`：API Key 輸入表單、儲存至 `st_settings`、連線測試按鈕
-- [ ] `js/ai-chat.js`：動態注入浮鈕 + 聊天視窗 DOM 到所有頁面
-- [ ] 未設定 API Key 時顯示提示，引導前往設定頁
-- [ ] 讀取當前頁面與科目作為情境，組成 System Prompt（「你是學習助理，使用者目前在 {page}，正在學習 {subject}」）
-- [ ] 呼叫 `gemini-2.0-flash` REST API（`POST /v1beta/models/gemini-2.0-flash:generateContent`）
-- [ ] 傳入最近 10 則對話歷史實現連續追問
-- [ ] 對話歷史儲存至 `st_ai_history`（保留最近 50 則）
-- [ ] 手機版聊天視窗全屏展開
+- [x] `settings.html`：API Key 輸入表單、儲存至 `st_settings`、連線測試按鈕
+- [x] `js/ai-chat.js`：動態注入浮鈕 + 聊天視窗 DOM 到所有頁面
+- [x] 未設定 API Key 時顯示提示，引導前往設定頁
+- [x] 讀取當前頁面與科目作為情境，組成 System Prompt（「你是學習助理，使用者目前在 {page}，正在學習 {subject}」）
+- [x] 呼叫 `gemini-2.0-flash` REST API（`POST /v1beta/models/gemini-2.0-flash:generateContent`）
+- [x] 傳入對話歷史實現連續追問（無上限，依 topicId 分組）
+- [x] 對話歷史儲存至 `st_ai_history` + `st_ai_topics`（全量保留，依日期分組查看）
+- [x] 話題系統（新話題 / 延續上次 / 歷史面板查看、載入、刪除）
+- [x] 📊 一鍵插入統計功能：讀取各科目 sessions/goals 計算摘要並插入輸入框
+- [x] 全域代理：`insertSubjectStats` 透過 `window._aiChat` 對外暴露
 
 **完成標準：** 在任一頁面點擊浮鈕可開啟聊天，可連續追問，AI 回覆能感知當前學習情境。
 
@@ -304,12 +306,14 @@
 **目標：** 儀表板整合所有模組資料，完成 RWD 調整與跨頁面測試。
 
 **子任務清單：**
-- [ ] 今日摘要 4 卡片（從 `st_sessions` 計算當日數據）
-- [ ] 快速啟動計時器（選科目後跳轉 `timer.html?subject=id`）
-- [ ] 近期 5 筆學習記錄列表
-- [ ] 進行中目標進度條（讀取 `st_goals`）
-- [ ] 全站 RWD 調整（手機版導覽列漢堡選單、卡片單欄排列）
-- [ ] 跨頁面端對端功能測試（計時 → 記錄出現在統計 → 目標進度更新 → AI 問答情境正確）
+- [x] 今日摘要 4 卡片（從 `st_sessions` 計算當日數據）
+- [x] 快速啟動計時器（選科目後跳轉 `timer.html?subject=id&mode=pomodoro`）
+- [x] 近期 5 筆學習記錄列表
+- [x] 進行中目標進度條（讀取 `st_goals`）
+- [x] 全站 RWD：手機版漢堡選單、儀表板雙欄→單欄（`.dashboard-two-col`）
+- [x] 全站 RWD：科目格子（`.subjects-grid`）、圖表（`.charts-grid`）→ 手機單欄
+- [x] 全站 RWD：Modal（`.form-row-2col`）、設定頁（`.settings-grid`）→ 手機單欄
+- [x] 全站 RWD：計時器大字 `clamp()` 縮放、Modal overflow scroll
 
 **完成標準：** 儀表板正確顯示當日資料，手機版瀏覽無版面跑版，完整使用流程順暢。
 
