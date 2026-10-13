@@ -265,8 +265,8 @@
 
     // 清除所有資料
     document.getElementById('clear-all-btn').addEventListener('click', () => {
-      if (confirm('⚠️ 確定要清除所有資料（科目、記錄、目標）？此動作無法復原！')) {
-        ['st_subjects','st_sessions','st_goals','st_ai_history'].forEach(k =>
+      if (confirm('⚠️ 確定要清除所有資料（科目、記錄、目標、AI 對話）？此動作無法復原！')) {
+        ['st_subjects','st_sessions','st_goals','st_ai_history','st_ai_topics'].forEach(k =>
           localStorage.removeItem(k));
         alert('✅ 所有資料已清除，頁面將重新整理。');
         location.reload();

@@ -146,8 +146,25 @@ function initHamburger() {
   btn.addEventListener('click', () => links.classList.toggle('open'));
 }
 
-// 頁面載入後自動初始化導覽列
+// 頁面載入後自動初始化導覽列 + 首次訪問預設科目
 document.addEventListener('DOMContentLoaded', () => {
   initNavActive();
   initHamburger();
+  initDefaultSubjects();
 });
+
+/**
+ * 首次訪問時預置 3 筆預設科目（只在 st_subjects 尚未存在時執行）
+ */
+function initDefaultSubjects() {
+  if (localStorage.getItem('st_subjects') !== null) return; // 已有資料，跳過
+  const defaults = [
+    { id: generateId(), name: '數學',   emoji: '➗', color: '#4a9eff',
+      dailyTargetMinutes: 60,  priority: 'high',   note: '', createdAt: new Date().toISOString() },
+    { id: generateId(), name: '英文',   emoji: '📖', color: '#8e44ad',
+      dailyTargetMinutes: 45,  priority: 'medium', note: '', createdAt: new Date().toISOString() },
+    { id: generateId(), name: '程式設計', emoji: '💻', color: '#27ae60',
+      dailyTargetMinutes: 90,  priority: 'high',   note: '', createdAt: new Date().toISOString() },
+  ];
+  localStorage.setItem('st_subjects', JSON.stringify(defaults));
+}

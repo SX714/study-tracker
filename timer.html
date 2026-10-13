@@ -362,6 +362,14 @@
       }
     });
 
+    // 離頁提示：計時進行中時警告
+    window.addEventListener('beforeunload', e => {
+      if (running) {
+        e.preventDefault();
+        e.returnValue = '計時器正在運行中，離開頁面將中斷計時，確定要離開嗎？';
+      }
+    });
+
     // 初始化
     updateDisplay();
     updateDots();

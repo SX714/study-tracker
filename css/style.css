@@ -102,10 +102,16 @@ ul { list-style: none; }
   gap: 6px;
 }
 
-.nav-links a:hover,
-.nav-links a.active {
+.nav-links a:hover {
   background: rgba(255,255,255,0.12);
   color: #fff;
+}
+
+.nav-links a.active {
+  background: rgba(255,255,255,0.22);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 rgba(255,255,255,0.6);
 }
 
 .nav-links a .nav-icon { font-size: 1rem; }
@@ -470,6 +476,7 @@ footer {
   /* 統計圖表 → 單欄 */
   .chart-grid  { grid-template-columns: 1fr !important; }
   .charts-grid { grid-template-columns: 1fr !important; }
+  .chart-card.full-width { grid-column: 1 !important; }
 
   /* 目標卡片操作按鈕縮小 */
   .goal-card .btn { padding: 5px 10px; font-size: 0.78rem; }

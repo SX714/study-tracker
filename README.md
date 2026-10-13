@@ -44,10 +44,10 @@
 
 | Phase | 說明 | 狀態 |
 |-------|------|------|
-| Phase 1 | 專案骨架與共用基礎 | ⏳ pending |
-| Phase 2 | 科目管理 | ⏳ pending |
-| Phase 3 | 計時器 | ⏳ pending |
-| Phase 4 | 統計圖表 | ⏳ pending |
-| Phase 5 | 目標計畫 | ⏳ pending |
-| Phase 6 | AI 問答助理 + 設定頁 | ⏳ pending |
-| Phase 7 | 儀表板與全站整合 | ⏳ pending |
+| Phase 1 | 專案骨架與共用基礎 | ✅ done |
+| Phase 2 | 科目管理 | ✅ done |
+| Phase 3 | 計時器 | ✅ done |
+| Phase 4 | 統計圖表 | ✅ done |
+| Phase 5 | 目標計畫 | ✅ done |
+| Phase 6 | AI 問答助理 + 設定頁 | ✅ done |
+| Phase 7 | 儀表板與全站整合 | ✅ done |
