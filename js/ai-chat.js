@@ -11,8 +11,8 @@
      =========================== */
   const GEMINI_API_URL =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-  const MAX_HISTORY  = 50;  // localStorage 保留最多 50 則
-  const CTX_HISTORY  = 10;  // 每次 API 呼叫帶入最近 10 則（5 輪對話）
+  const MAX_HISTORY  = 9999; // 無上限，保留所有歷史
+  const CTX_HISTORY  = 10;   // 每次 API 呼叫帶入最近 10 則（5 輪對話）
   const STORAGE_KEY  = 'st_ai_history';
   const SETTINGS_KEY = 'st_settings';
 
@@ -111,6 +111,11 @@
   /* ===========================
      DOM 注入
      =========================== */
+  /** 目前顯示模式：'chat'（當前對話）或 'history'（所有歷史） */
+  let viewMode = 'chat';
+  /** 當前對話（開啟視窗後的訊息，不含歷史） */
+  let currentSession = [];
+
   function injectWidget() {
     // 避免重複注入
     if (document.getElementById('ai-chat-widget')) return;
@@ -132,9 +137,16 @@
             </div>
           </div>
           <div id="ai-chat-header-right">
-            <button id="ai-chat-clear" title="清除對話">🗑</button>
+            <button id="ai-chat-history-btn" title="查看歷史記錄">🕘</button>
+            <button id="ai-chat-clear" title="清除所有歷史">🗑</button>
             <button id="ai-chat-close" title="關閉">✕</button>
           </div>
+        </div>
+
+        <!-- 模式切換 Tab -->
+        <div id="ai-view-tabs">
+          <button class="ai-tab active" data-view="chat">目前對話</button>
+          <button class="ai-tab" data-view="history">全部歷史</button>
         </div>
 
         <div id="ai-chat-messages">
@@ -215,6 +227,31 @@
         overflow: hidden;
       }
       #ai-chat-window.open { display: flex; }
+
+      /* 模式切換 Tab */
+      #ai-view-tabs {
+        display: flex;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+        flex-shrink: 0;
+      }
+      .ai-tab {
+        flex: 1;
+        padding: 8px 0;
+        font-size: 0.82rem;
+        font-weight: 600;
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: #94a3b8;
+        border-bottom: 2px solid transparent;
+        transition: color 0.15s, border-color 0.15s;
+      }
+      .ai-tab.active {
+        color: #4a9eff;
+        border-bottom-color: #4a9eff;
+        background: #fff;
+      }
 
       /* Header */
       #ai-chat-header {
@@ -302,6 +339,23 @@
         align-self: flex-start;
         background: #fee2e2;
         color: #b91c1c;
+      }
+
+      /* 日期分隔線（歷史模式用） */
+      .ai-date-divider {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.72rem;
+        color: #94a3b8;
+        margin: 8px 0 4px;
+      }
+      .ai-date-divider::before,
+      .ai-date-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: #e2e8f0;
       }
 
       /* 空狀態 */
@@ -405,16 +459,16 @@
      事件綁定
      =========================== */
   function bindEvents() {
-    const fab    = document.getElementById('ai-fab');
-    const win    = document.getElementById('ai-chat-window');
-    const closeBtn = document.getElementById('ai-chat-close');
-    const clearBtn = document.getElementById('ai-chat-clear');
-    const sendBtn  = document.getElementById('ai-chat-send');
-    const input    = document.getElementById('ai-chat-input');
+    const fab        = document.getElementById('ai-fab');
+    const win        = document.getElementById('ai-chat-window');
+    const closeBtn   = document.getElementById('ai-chat-close');
+    const clearBtn   = document.getElementById('ai-chat-clear');
+    const historyBtn = document.getElementById('ai-chat-history-btn');
+    const sendBtn    = document.getElementById('ai-chat-send');
+    const input      = document.getElementById('ai-chat-input');
 
     // 開關聊天視窗
     fab.addEventListener('click', () => toggleWindow());
-
     closeBtn.addEventListener('click', () => closeWindow());
 
     // ESC 關閉
@@ -422,11 +476,22 @@
       if (e.key === 'Escape' && win.classList.contains('open')) closeWindow();
     });
 
-    // 清除對話
+    // 清除所有歷史
     clearBtn.addEventListener('click', () => {
-      if (!confirm('確定要清除所有對話記錄？')) return;
+      if (!confirm('確定要清除所有對話歷史？此動作無法復原。')) return;
       saveHistory([]);
+      currentSession = [];
       renderMessages();
+    });
+
+    // 歷史快捷鍵（切換到歷史 Tab）
+    historyBtn.addEventListener('click', () => switchView('history'));
+
+    // Tab 切換
+    document.getElementById('ai-view-tabs').addEventListener('click', e => {
+      const tab = e.target.closest('.ai-tab');
+      if (!tab) return;
+      switchView(tab.dataset.view);
     });
 
     // 送出訊息
@@ -443,6 +508,19 @@
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 100) + 'px';
     });
+  }
+
+  /* ===========================
+     模式切換（目前對話 / 全部歷史）
+     =========================== */
+  function switchView(mode) {
+    viewMode = mode;
+    document.querySelectorAll('.ai-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.view === mode));
+    // 歷史模式隱藏輸入框
+    const inputArea = document.getElementById('ai-chat-input-area');
+    if (inputArea) inputArea.style.display = mode === 'history' ? 'none' : 'flex';
+    renderMessages();
   }
 
   /* ===========================
@@ -503,9 +581,16 @@
      =========================== */
   function renderMessages() {
     const container = document.getElementById('ai-chat-messages');
-    const history   = loadHistory();
+    if (viewMode === 'history') {
+      renderHistory(container);
+    } else {
+      renderCurrentSession(container);
+    }
+  }
 
-    if (history.length === 0) {
+  /** 渲染當前對話（本次開啟視窗後的訊息） */
+  function renderCurrentSession(container) {
+    if (currentSession.length === 0) {
       container.innerHTML = `
         <div id="ai-chat-welcome">
           <div class="welcome-icon">🤖</div>
@@ -514,12 +599,40 @@
         </div>`;
       return;
     }
-
-    container.innerHTML = history.map(m => `
+    container.innerHTML = currentSession.map(m => `
       <div class="ai-msg ${m.role === 'user' ? 'user' : 'model'}">
         ${escapeHtml(m.text)}
       </div>`).join('');
+    scrollToBottom();
+  }
 
+  /** 渲染全部歷史（依日期分組） */
+  function renderHistory(container) {
+    const history = loadHistory();
+    if (history.length === 0) {
+      container.innerHTML = `
+        <div id="ai-chat-welcome">
+          <div class="welcome-icon">🕘</div>
+          <p>尚無對話歷史記錄</p>
+        </div>`;
+      return;
+    }
+    let lastDate = '';
+    container.innerHTML = history.map(m => {
+      const dateStr = m.timestamp
+        ? new Date(m.timestamp).toLocaleDateString('zh-TW',
+            { year: 'numeric', month: 'long', day: 'numeric' })
+        : '未知日期';
+      let html = '';
+      if (dateStr !== lastDate) {
+        html += `<div class="ai-date-divider">${dateStr}</div>`;
+        lastDate = dateStr;
+      }
+      html += `<div class="ai-msg ${m.role === 'user' ? 'user' : 'model'}">
+        ${escapeHtml(m.text)}
+      </div>`;
+      return html;
+    }).join('');
     scrollToBottom();
   }
 
@@ -580,12 +693,15 @@
       // 移除 loading
       loadingEl.remove();
 
-      // 顯示 AI 回覆
+      // 顯示 AI 回覆（加入當前對話）
+      const now = new Date().toISOString();
+      currentSession.push({ role: 'user',  text, timestamp: now });
+      currentSession.push({ role: 'model', text: reply, timestamp: now });
       appendMessage('model', reply);
 
-      // 儲存對話歷史
-      history.push({ role: 'user',  text, timestamp: new Date().toISOString() });
-      history.push({ role: 'model', text: reply, timestamp: new Date().toISOString() });
+      // 儲存至全部歷史
+      history.push({ role: 'user',  text, timestamp: now });
+      history.push({ role: 'model', text: reply, timestamp: now });
       saveHistory(history);
 
     } catch (err) {
