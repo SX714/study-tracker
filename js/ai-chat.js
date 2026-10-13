@@ -48,6 +48,62 @@
       + `\n請根據使用者的學習情境提供有幫助的回答，例如解題、概念解釋、學習建議等。`;
   }
 
+  /** 讀取某科目的統計數據，組成可讀摘要字串 */
+  function getSubjectStats(subjectId) {
+    try {
+      const subjects = JSON.parse(localStorage.getItem('st_subjects') || '[]');
+      const sessions = JSON.parse(localStorage.getItem('st_sessions') || '[]');
+      const goals    = JSON.parse(localStorage.getItem('st_goals')    || '[]');
+      const sub      = subjects.find(s => s.id === subjectId);
+      if (!sub) return null;
+
+      const subSessions = sessions.filter(s => s.subjectId === subjectId);
+      const totalMin    = subSessions.reduce((a, s) => a + (s.durationMinutes || 0), 0);
+      const count       = subSessions.length;
+      const pomodoros   = subSessions.filter(s => s.mode === 'pomodoro' && s.completed).length;
+
+      // 本週
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
+      weekStart.setHours(0, 0, 0, 0);
+      const weekMin = subSessions
+        .filter(s => new Date(s.startAt) >= weekStart)
+        .reduce((a, s) => a + (s.durationMinutes || 0), 0);
+
+      // 今日
+      const todayStr = now.toISOString().slice(0, 10);
+      const todayMin = subSessions
+        .filter(s => s.startAt.startsWith(todayStr))
+        .reduce((a, s) => a + (s.durationMinutes || 0), 0);
+
+      // 進行中目標
+      const todayDate = todayStr;
+      const activeGoals = goals.filter(g =>
+        g.endDate >= todayDate && (!g.subjectId || g.subjectId === subjectId));
+      const goalLines = activeGoals.map(g => {
+        const done = sessions
+          .filter(s => s.startAt.slice(0,10) >= g.startDate && s.startAt.slice(0,10) <= g.endDate
+            && (!g.subjectId || s.subjectId === subjectId))
+          .reduce((a, s) => a + (s.durationMinutes || 0), 0);
+        const pct = Math.min(100, Math.round(done / g.targetMinutes * 100));
+        return `• ${g.title}：${pct}%（${Math.round(done/60*10)/10}h / ${Math.round(g.targetMinutes/60*10)/10}h）`;
+      });
+
+      const fmtMin = m => m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`;
+
+      return [
+        `【${sub.emoji || ''} ${sub.name} 學習統計】`,
+        `• 累計總時數：${fmtMin(totalMin)}（共 ${count} 次）`,
+        `• 今日學習：${fmtMin(todayMin)}`,
+        `• 本週學習：${fmtMin(weekMin)}`,
+        `• 完成番茄數：${pomodoros} 🍅`,
+        `• 每日目標：${sub.dailyTargetMinutes ? fmtMin(sub.dailyTargetMinutes) : '未設定'}`,
+        goalLines.length ? `\n【目標進度】\n${goalLines.join('\n')}` : ''
+      ].filter(Boolean).join('\n');
+    } catch { return null; }
+  }
+
   /* ===========================
      Gemini API
      =========================== */
@@ -142,7 +198,10 @@
         <div id="ai-chat-input-area">
           <div id="ai-topic-label-bar">
             <span id="ai-topic-label-text">話題：新對話</span>
+            <button id="ai-stats-btn" title="讀取科目統計數據">📊 插入統計</button>
           </div>
+          <!-- 科目統計快捷列（點擊「插入統計」後展開） -->
+          <div id="ai-stats-picker" style="display:none;"></div>
           <div id="ai-input-row">
             <textarea id="ai-chat-input" placeholder="輸入問題，Enter 送出…" rows="1" maxlength="2000"></textarea>
             <button id="ai-chat-send" title="送出">➤</button>
@@ -294,8 +353,38 @@
       #ai-topic-label-bar {
         padding:5px 12px 0;
         font-size:0.72rem; color:#94a3b8;
+        display:flex; justify-content:space-between; align-items:center;
       }
       #ai-topic-label-text { font-style:italic; }
+      #ai-stats-btn {
+        font-size:0.72rem; font-weight:600; padding:2px 8px;
+        border-radius:6px; border:1px solid #bfdbfe; background:#eff6ff;
+        color:#1d4ed8; cursor:pointer; white-space:nowrap;
+        transition:background .15s;
+      }
+      #ai-stats-btn:hover { background:#dbeafe; }
+
+      /* 科目統計快捷列 */
+      #ai-stats-picker {
+        padding:6px 10px 4px;
+        border-bottom:1px solid #e2e8f0;
+        background:#f0f7ff;
+      }
+      #ai-stats-picker-title {
+        font-size:0.7rem; color:#5a6a7e; font-weight:600;
+        text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px;
+      }
+      #ai-stats-picker-btns {
+        display:flex; flex-wrap:wrap; gap:5px;
+      }
+      .ai-stats-subject-btn {
+        display:inline-flex; align-items:center; gap:4px;
+        font-size:0.78rem; font-weight:600; padding:3px 10px;
+        border-radius:100px; border:1.5px solid transparent;
+        cursor:pointer; background:#fff; transition:border-color .15s, background .15s;
+      }
+      .ai-stats-subject-btn:hover { background:#e0f2fe; }
+      .ai-stats-subject-btn.active { border-color:#4a9eff; background:#eff6ff; }
       #ai-input-row {
         display:flex; align-items:flex-end; gap:8px; padding:8px 12px 10px;
       }
@@ -419,6 +508,9 @@
 
     // 新話題按鈕（聊天中途開新話題）
     document.getElementById('ai-new-topic-btn').addEventListener('click', () => showTopicPicker());
+
+    // 📊 插入統計按鈕
+    document.getElementById('ai-stats-btn').addEventListener('click', toggleStatsPicker);
 
     // 歷史面板
     document.getElementById('ai-chat-history-btn').addEventListener('click', openHistoryPanel);
@@ -549,6 +641,58 @@
     const inputArea = document.getElementById('ai-chat-input-area');
     if (inputArea) inputArea.style.display = mode === 'history' ? 'none' : 'flex';
     renderMessages();
+  }
+
+  /* ===========================
+     科目統計快捷列
+     =========================== */
+  function toggleStatsPicker() {
+    const picker = document.getElementById('ai-stats-picker');
+    const btn    = document.getElementById('ai-stats-btn');
+    const isOpen = picker.style.display !== 'none';
+    if (isOpen) {
+      picker.style.display = 'none';
+      btn.textContent = '📊 插入統計';
+      return;
+    }
+    try {
+      const subjects = JSON.parse(localStorage.getItem('st_subjects') || '[]');
+      if (subjects.length === 0) {
+        picker.innerHTML = `<div id="ai-stats-picker-title">尚無科目，請先至科目管理新增。</div>`;
+        picker.style.display = 'block';
+        return;
+      }
+      picker.innerHTML = `
+        <div id="ai-stats-picker-title">📊 選擇科目以插入統計數據</div>
+        <div id="ai-stats-picker-btns">
+          ${subjects.map(s => `
+            <button class="ai-stats-subject-btn"
+              data-id="${s.id}"
+              style="border-color:${s.color}20; color:${s.color};"
+              onclick="window._aiChat.insertSubjectStats('${s.id}')">
+              ${s.emoji || ''} ${s.name}
+            </button>`).join('')}
+        </div>`;
+      picker.style.display = 'block';
+      btn.textContent = '✕ 收起';
+    } catch (e) {
+      picker.style.display = 'none';
+    }
+  }
+
+  function insertSubjectStats(subjectId) {
+    const stats = getSubjectStats(subjectId);
+    if (!stats) return;
+    const input = document.getElementById('ai-chat-input');
+    const existing = input.value.trim();
+    input.value = existing
+      ? existing + '\n\n' + stats + '\n\n請根據以上統計，給我學習建議。'
+      : stats + '\n\n請根據以上統計，給我學習建議。';
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+    input.focus();
+    document.querySelectorAll('.ai-stats-subject-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.id === subjectId));
   }
 
   /* ===========================
@@ -813,11 +957,12 @@
     document.getElementById('ai-fab-btn')?.remove();
   });
 
-  // 將 loadTopic / deleteTopic 掛載到 window（供 HTML onclick 呼叫）
-  window._aiChat = { loadTopic, deleteTopic };
+  // 將 loadTopic / deleteTopic / insertSubjectStats 掛載到 window（供 HTML onclick 呼叫）
+  window._aiChat = { loadTopic, deleteTopic, insertSubjectStats };
 
 })();
 
-// 全域代理（ai-history-panel 內的 onclick 需要存取）
-function loadTopic(id)   { window._aiChat.loadTopic(id); }
-function deleteTopic(id) { window._aiChat.deleteTopic(id); }
+// 全域代理（ai-history-panel / ai-stats-picker 內的 onclick 需要存取）
+function loadTopic(id)            { window._aiChat.loadTopic(id); }
+function deleteTopic(id)          { window._aiChat.deleteTopic(id); }
+function insertSubjectStats(id)   { window._aiChat.insertSubjectStats(id); }
