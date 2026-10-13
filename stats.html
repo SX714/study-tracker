@@ -101,38 +101,49 @@
       </div>
     </div>
 
-    <!-- 圖表區 -->
-    <div class="charts-grid">
-      <div class="chart-card full-width">
-        <div class="chart-title">📅 每日學習時數（分鐘）</div>
-        <canvas id="chart-daily" height="100"></canvas>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">📈 每週趨勢（小時）</div>
-        <canvas id="chart-weekly" height="200"></canvas>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">🥧 科目時數分佈</div>
-        <canvas id="chart-doughnut" height="200"></canvas>
-      </div>
+    <!-- 無資料空狀態 -->
+    <div id="charts-empty" class="empty-state" style="display:none;">
+      <div class="empty-icon">📭</div>
+      <p>此區間尚無學習記錄</p>
+      <p style="margin-top:8px; font-size:0.85rem;">
+        前往<a href="timer.html">計時器</a>開始第一次學習，記錄就會出現在這裡！
+      </p>
     </div>
 
-    <!-- 統計表格 -->
-    <div class="card">
-      <div class="card-title mb-16">📋 各科目統計</div>
-      <div id="stats-table-wrap">
-        <table class="stats-table">
-          <thead>
-            <tr>
-              <th>科目</th>
-              <th>總時數</th>
-              <th>學習次數</th>
-              <th>平均每次</th>
-              <th>完成番茄</th>
-            </tr>
-          </thead>
-          <tbody id="stats-tbody"></tbody>
-        </table>
+    <!-- 圖表區（有資料時顯示） -->
+    <div id="charts-area">
+      <div class="charts-grid">
+        <div class="chart-card full-width">
+          <div class="chart-title">📅 每日學習時數（分鐘）</div>
+          <canvas id="chart-daily" height="100"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">📈 每週趨勢（小時）</div>
+          <canvas id="chart-weekly" height="200"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">🥧 科目時數分佈</div>
+          <canvas id="chart-doughnut" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- 統計表格 -->
+      <div class="card">
+        <div class="card-title mb-16">📋 各科目統計</div>
+        <div id="stats-table-wrap">
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th>科目</th>
+                <th>總時數</th>
+                <th>學習次數</th>
+                <th>平均每次</th>
+                <th>完成番茄</th>
+              </tr>
+            </thead>
+            <tbody id="stats-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </main>
@@ -185,6 +196,13 @@
     function drawCharts() {
       const sessions = getFilteredSessions();
       const dates    = dateRange(rangeStart, rangeEnd);
+
+      // 無資料時顯示空狀態提示
+      const noData = sessions.length === 0;
+      document.getElementById('charts-empty').style.display = noData ? 'block' : 'none';
+      document.getElementById('charts-area').style.display  = noData ? 'none'  : 'block';
+      if (noData) return;
+
 
       // 每日時數
       const dailyData = dates.map(d =>

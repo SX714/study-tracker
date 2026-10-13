@@ -148,13 +148,19 @@
       <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
         所有資料儲存於本機瀏覽器 localStorage。清除後無法復原，請謹慎操作。
       </p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <button class="btn btn-ghost" id="export-btn">📤 匯出資料（JSON）</button>
+        <label class="btn btn-ghost" style="cursor:pointer;" title="匯入先前備份的 JSON 檔案">
+          📥 匯入資料（JSON）
+          <input type="file" id="import-file" accept=".json" style="display:none;">
+        </label>
         <button class="btn btn-ghost btn-sm" id="clear-sessions-btn"
                 style="color:var(--danger);">🗑 清除學習記錄</button>
         <button class="btn btn-ghost btn-sm" id="clear-all-btn"
                 style="color:var(--danger);">⚠️ 清除所有資料</button>
       </div>
+      <div id="import-result" style="display:none; margin-top:10px; font-size:0.85rem;
+           padding:8px 12px; border-radius:8px;"></div>
     </div>
   </main>
 
@@ -237,6 +243,42 @@
       s.longBreakInterval = parseInt(document.getElementById('s-interval').value) || 4;
       saveData('st_settings', s);
       alert('✅ 計時器設定已儲存！');
+    });
+
+    // 匯入資料
+    document.getElementById('import-file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          const keys = ['st_subjects', 'st_sessions', 'st_goals'];
+          let imported = 0;
+          keys.forEach(k => {
+            if (Array.isArray(data[k])) {
+              localStorage.setItem(k, JSON.stringify(data[k]));
+              imported++;
+            }
+          });
+          const el = document.getElementById('import-result');
+          if (imported > 0) {
+            el.style.cssText = 'display:block; background:#dcfce7; color:#15803d;';
+            el.textContent = `✅ 成功匯入 ${imported} 項資料（科目、記錄、目標）。頁面將重新整理。`;
+            setTimeout(() => location.reload(), 1500);
+          } else {
+            el.style.cssText = 'display:block; background:#fee2e2; color:#b91c1c;';
+            el.textContent = '❌ 檔案格式不正確，請使用本工具匯出的 JSON 備份。';
+          }
+        } catch {
+          const el = document.getElementById('import-result');
+          el.style.cssText = 'display:block; background:#fee2e2; color:#b91c1c;';
+          el.textContent = '❌ 無法解析 JSON 檔案，請確認檔案完整性。';
+        }
+        // 清空 input，允許重新選同一檔案
+        e.target.value = '';
+      };
+      reader.readAsText(file);
     });
 
     // 匯出資料

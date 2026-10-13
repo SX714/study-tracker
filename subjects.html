@@ -225,7 +225,9 @@
             </div>
             ${s.note ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:8px;">${s.note}</div>` : ''}
             <div class="subject-card-actions">
-              <button class="btn btn-outline btn-sm w-full" onclick="openEdit('${s.id}')">✏️ 編輯</button>
+              <a href="timer.html?subject=${s.id}&mode=pomodoro"
+                 class="btn btn-primary btn-sm" style="flex:1; text-align:center;">▶ 計時</a>
+              <button class="btn btn-outline btn-sm" onclick="openEdit('${s.id}')">✏️</button>
               <button class="btn btn-ghost btn-sm" onclick="deleteSubject('${s.id}')">🗑️</button>
             </div>
           </div>`;
