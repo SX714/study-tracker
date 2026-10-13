@@ -445,36 +445,45 @@ footer {
 
   .navbar { padding: 0 16px; }
 
-  /* 導覽列手機版 */
+  /* 手機版漢堡選單 */
   .nav-links {
-    display: none;
-    flex-direction: column;
-    position: absolute;
-    top: var(--nav-height); left: 0; right: 0;
-    background: var(--primary);
-    padding: 12px 16px;
-    gap: 4px;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    z-index: 99;
+    display: none; flex-direction: column; position: absolute;
+    top: var(--nav-height); left: 0; right: 0; background: var(--primary);
+    padding: 12px 16px; gap: 4px; border-top: 1px solid rgba(255,255,255,0.1);
+    z-index: 200;
   }
   .nav-links.open { display: flex; }
-  .nav-hamburger  { display: flex; }
+  .nav-hamburger { display: flex; }
 
-  /* 摘要卡片：手機保持 2 欄 */
+  /* 摘要卡片 2×2 */
   .summary-grid { grid-template-columns: 1fr 1fr; }
 
-  /* 儀表板下方雙欄 → 單欄 */
-  .dashboard-grid { grid-template-columns: 1fr !important; }
-
-  /* 頁面標題 */
+  /* 頁面標題橫轉直 */
   .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
 
-  /* Modal 手機版 */
-  .modal { padding: 20px 16px; max-width: 100%; margin: 0 12px; }
+  /* 儀表板底部雙欄 → 單欄 */
+  .dashboard-two-col { grid-template-columns: 1fr !important; }
 
-  /* 計時器大字 */
-  .timer-display { font-size: 3.6rem !important; }
+  /* 科目卡片格子 → 單欄 */
+  .subjects-grid { grid-template-columns: 1fr !important; }
 
-  /* AI 浮鈕下移，避免與系統導覽列重疊 */
+  /* 統計圖表 → 單欄 */
+  .chart-grid  { grid-template-columns: 1fr !important; }
+  .charts-grid { grid-template-columns: 1fr !important; }
+
+  /* 目標卡片操作按鈕縮小 */
+  .goal-card .btn { padding: 5px 10px; font-size: 0.78rem; }
+
+  /* 計時器大字縮小 */
+  .timer-display { font-size: clamp(3rem, 18vw, 6rem) !important; }
+
+  /* Modal 寬度 100% */
+  .modal-content { margin: 20px 12px; max-height: calc(100dvh - 40px); overflow-y: auto; }
+
+  /* Modal / 設定頁 雙欄表單 → 單欄 */
+  .form-row-2col  { grid-template-columns: 1fr !important; }
+  .settings-grid  { grid-template-columns: 1fr !important; }
+
+  /* AI 浮鈕位置 */
   .ai-fab { bottom: 20px; right: 20px; }
 }
