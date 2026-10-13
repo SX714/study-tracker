@@ -445,17 +445,36 @@ footer {
 
   .navbar { padding: 0 16px; }
 
-  .nav-links { display: none; flex-direction: column; position: absolute;
-    top: var(--nav-height); left: 0; right: 0; background: var(--primary);
-    padding: 12px 16px; gap: 4px; border-top: 1px solid rgba(255,255,255,0.1); }
-
+  /* 導覽列手機版 */
+  .nav-links {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: var(--nav-height); left: 0; right: 0;
+    background: var(--primary);
+    padding: 12px 16px;
+    gap: 4px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    z-index: 99;
+  }
   .nav-links.open { display: flex; }
+  .nav-hamburger  { display: flex; }
 
-  .nav-hamburger { display: flex; }
-
+  /* 摘要卡片：手機保持 2 欄 */
   .summary-grid { grid-template-columns: 1fr 1fr; }
 
+  /* 儀表板下方雙欄 → 單欄 */
+  .dashboard-grid { grid-template-columns: 1fr !important; }
+
+  /* 頁面標題 */
   .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
 
+  /* Modal 手機版 */
+  .modal { padding: 20px 16px; max-width: 100%; margin: 0 12px; }
+
+  /* 計時器大字 */
+  .timer-display { font-size: 3.6rem !important; }
+
+  /* AI 浮鈕下移，避免與系統導覽列重疊 */
   .ai-fab { bottom: 20px; right: 20px; }
 }
