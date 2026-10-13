@@ -1,133 +1,93 @@
 /**
  * ai-chat.js — Study Tracker AI 問答助理
- * 在所有頁面注入右下角浮鈕 + 聊天視窗，呼叫 Gemini REST API
- * 使用方式：在每個 HTML 頁面底部 <script src="js/ai-chat.js"></script>
+ * 功能：右下角浮鈕 + 聊天視窗，Gemini REST API，話題管理，歷史查看與選擇性清除
  */
 (function () {
   'use strict';
 
   /* ===========================
-     常數設定
+     常數
      =========================== */
   const GEMINI_API_URL =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-  const MAX_HISTORY  = 9999; // 無上限，保留所有歷史
-  const CTX_HISTORY  = 10;   // 每次 API 呼叫帶入最近 10 則（5 輪對話）
-  const STORAGE_KEY  = 'st_ai_history';
-  const SETTINGS_KEY = 'st_settings';
+  const CTX_HISTORY   = 10;              // Gemini 每次帶入最近 10 則
+  const HISTORY_KEY   = 'st_ai_history'; // [{ id, topicId, role, text, timestamp }]
+  const TOPICS_KEY    = 'st_ai_topics';  // [{ id, title, createdAt, page }]
+  const SETTINGS_KEY  = 'st_settings';
 
   /* ===========================
-     工具函式
+     localStorage 工具
      =========================== */
   function getApiKey() {
-    try {
-      const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-      return s.geminiApiKey || '';
-    } catch { return ''; }
+    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}').geminiApiKey || ''; }
+    catch { return ''; }
   }
+  function loadHistory()         { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; } }
+  function saveHistory(h)        { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); }
+  function loadTopics()          { try { return JSON.parse(localStorage.getItem(TOPICS_KEY)  || '[]'); } catch { return []; } }
+  function saveTopics(t)         { localStorage.setItem(TOPICS_KEY,  JSON.stringify(t)); }
 
-  function loadHistory() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    } catch { return []; }
-  }
-
-  function saveHistory(history) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-MAX_HISTORY)));
-  }
-
-  /** 取得目前頁面名稱（用於情境感知） */
+  /* ===========================
+     頁面 / 情境
+     =========================== */
   function getCurrentPage() {
-    const file = location.pathname.split('/').pop() || 'index.html';
-    const map = {
-      'index.html':    '儀表板',
-      'subjects.html': '科目管理',
-      'timer.html':    '計時器',
-      'stats.html':    '統計圖表',
-      'goals.html':    '目標計畫',
-      'settings.html': '設定'
-    };
-    return map[file] || file;
+    const f = location.pathname.split('/').pop() || 'index.html';
+    return { 'index.html':'儀表板','subjects.html':'科目管理','timer.html':'計時器',
+             'stats.html':'統計圖表','goals.html':'目標計畫','settings.html':'設定' }[f] || f;
   }
-
-  /** 取得目前選擇的科目名稱（timer.html 用） */
   function getCurrentSubject() {
     const sel = document.getElementById('subject-select');
-    if (!sel || !sel.value) return null;
-    try {
-      const subjects = JSON.parse(localStorage.getItem('st_subjects') || '[]');
-      return subjects.find(s => s.id === sel.value)?.name || null;
-    } catch { return null; }
+    if (!sel?.value) return null;
+    try { return JSON.parse(localStorage.getItem('st_subjects')||'[]').find(s=>s.id===sel.value)?.name||null; }
+    catch { return null; }
   }
-
-  /** 組成 System Prompt */
   function buildSystemPrompt() {
-    const page    = getCurrentPage();
-    const subject = getCurrentSubject();
-    let prompt = `你是 Study Tracker 的 AI 學習助理。請用繁體中文回答，回覆簡潔清楚。
-使用者目前在「${page}」頁面。`;
-    if (subject) prompt += `\n使用者正在學習「${subject}」科目。`;
-    prompt += `\n請根據使用者的學習情境提供有幫助的回答，例如解題、概念解釋、學習建議等。`;
-    return prompt;
+    const page = getCurrentPage(), sub = getCurrentSubject();
+    return `你是 Study Tracker 的 AI 學習助理。請用繁體中文回答，回覆簡潔清楚。使用者目前在「${page}」頁面。`
+      + (sub ? `\n使用者正在學習「${sub}」科目。` : '')
+      + `\n請根據使用者的學習情境提供有幫助的回答，例如解題、概念解釋、學習建議等。`;
   }
 
   /* ===========================
-     Gemini API 呼叫
+     Gemini API
      =========================== */
-  async function callGemini(userText, history) {
+  async function callGemini(userText, topicMessages) {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error('NO_KEY');
-
-    // 組合對話歷史（取最近 CTX_HISTORY 則）
-    const recentHistory = history.slice(-CTX_HISTORY);
+    const recent = topicMessages.slice(-CTX_HISTORY);
     const contents = [
-      // System instruction 以 user/model 對話形式注入
-      { role: 'user',  parts: [{ text: buildSystemPrompt() }] },
-      { role: 'model', parts: [{ text: '好的，我了解。請問有什麼我可以幫你的？' }] },
-      // 對話歷史
-      ...recentHistory.map(m => ({
-        role:  m.role,
-        parts: [{ text: m.text }]
-      })),
-      // 本次訊息
-      { role: 'user', parts: [{ text: userText }] }
+      { role:'user',  parts:[{ text: buildSystemPrompt() }] },
+      { role:'model', parts:[{ text:'好的，我了解。請問有什麼我可以幫你的？' }] },
+      ...recent.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
+      { role:'user',  parts:[{ text: userText }] }
     ];
-
     const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ contents })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ contents })
     });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '（無回應）';
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message||`HTTP ${res.status}`); }
+    return (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text || '（無回應）';
   }
+
+  /* ===========================
+     狀態
+     =========================== */
+  let viewMode      = 'chat';     // 'chat' | 'history'
+  let activeTopicId = null;       // 目前使用的話題 ID
+  let isNewTopic    = true;       // 本次是否為全新話題
 
   /* ===========================
      DOM 注入
      =========================== */
-  /** 目前顯示模式：'chat'（當前對話）或 'history'（所有歷史） */
-  let viewMode = 'chat';
-  /** 當前對話（開啟視窗後的訊息，不含歷史） */
-  let currentSession = [];
-
   function injectWidget() {
-    // 避免重複注入
     if (document.getElementById('ai-chat-widget')) return;
-
-    const widget = document.createElement('div');
-    widget.id = 'ai-chat-widget';
-    widget.innerHTML = `
-      <!-- 浮鈕 -->
+    const w = document.createElement('div');
+    w.id = 'ai-chat-widget';
+    w.innerHTML = `
       <button id="ai-fab" aria-label="開啟 AI 助理" title="AI 學習助理">💬</button>
 
-      <!-- 聊天視窗 -->
       <div id="ai-chat-window" aria-hidden="true">
+        <!-- Header -->
         <div id="ai-chat-header">
           <div id="ai-chat-header-left">
             <span id="ai-chat-icon">🤖</span>
@@ -137,355 +97,318 @@
             </div>
           </div>
           <div id="ai-chat-header-right">
-            <button id="ai-chat-history-btn" title="查看歷史記錄">🕘</button>
-            <button id="ai-chat-clear" title="清除所有歷史">🗑</button>
+            <button id="ai-new-topic-btn" title="開啟新話題">✏️</button>
+            <button id="ai-chat-history-btn" title="查看歷史">🕘</button>
             <button id="ai-chat-close" title="關閉">✕</button>
           </div>
         </div>
 
-        <!-- 模式切換 Tab -->
-        <div id="ai-view-tabs">
+        <!-- 話題選擇橫幅（首次開啟或切換話題時顯示） -->
+        <div id="ai-topic-picker">
+          <div id="ai-topic-picker-title">💬 選擇對話方式</div>
+          <button class="ai-topic-choice" id="ai-pick-new">
+            <span class="ai-topic-choice-icon">✨</span>
+            <div>
+              <div class="ai-topic-choice-label">開啟新話題</div>
+              <div class="ai-topic-choice-sub">全新開始，不帶入過去對話</div>
+            </div>
+          </button>
+          <button class="ai-topic-choice" id="ai-pick-continue">
+            <span class="ai-topic-choice-icon">🔁</span>
+            <div>
+              <div class="ai-topic-choice-label">延續上次話題</div>
+              <div class="ai-topic-choice-sub" id="ai-last-topic-sub">載入中…</div>
+            </div>
+          </button>
+        </div>
+
+        <!-- Tab -->
+        <div id="ai-view-tabs" style="display:none;">
           <button class="ai-tab active" data-view="chat">目前對話</button>
           <button class="ai-tab" data-view="history">全部歷史</button>
         </div>
 
-        <div id="ai-chat-messages">
-          <!-- 訊息由 JS 渲染 -->
-        </div>
+        <!-- 訊息區 -->
+        <div id="ai-chat-messages"></div>
 
-        <!-- 未設定 API Key 時顯示 -->
+        <!-- 未設定 Key -->
         <div id="ai-no-key">
           <div style="font-size:2rem;margin-bottom:12px;">🔑</div>
           <p>尚未設定 Gemini API Key</p>
           <a href="settings.html" id="ai-go-settings">前往設定</a>
         </div>
 
+        <!-- 輸入區 -->
         <div id="ai-chat-input-area">
-          <textarea
-            id="ai-chat-input"
-            placeholder="輸入問題，例：幫我解釋等差數列…"
-            rows="1"
-            maxlength="2000"
-          ></textarea>
-          <button id="ai-chat-send" title="送出">➤</button>
+          <div id="ai-topic-label-bar">
+            <span id="ai-topic-label-text">話題：新對話</span>
+          </div>
+          <div id="ai-input-row">
+            <textarea id="ai-chat-input" placeholder="輸入問題，Enter 送出…" rows="1" maxlength="2000"></textarea>
+            <button id="ai-chat-send" title="送出">➤</button>
+          </div>
         </div>
       </div>
-    `;
-    document.body.appendChild(widget);
 
+      <!-- 歷史面板（覆蓋在聊天視窗上） -->
+      <div id="ai-history-panel">
+        <div id="ai-history-header">
+          <span style="font-weight:700;">🕘 歷史對話</span>
+          <button id="ai-history-close">✕</button>
+        </div>
+        <div id="ai-history-list"></div>
+      </div>
+    `;
+    document.body.appendChild(w);
     injectStyles();
     bindEvents();
-    renderMessages();
     updateContext();
   }
 
   /* ===========================
-     樣式注入
+     樣式
      =========================== */
   function injectStyles() {
     if (document.getElementById('ai-chat-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'ai-chat-styles';
-    style.textContent = `
-      /* 浮鈕 */
+    const s = document.createElement('style');
+    s.id = 'ai-chat-styles';
+    s.textContent = `
+      /* ── 浮鈕 ── */
       #ai-fab {
-        position: fixed;
-        bottom: 28px;
-        right: 28px;
-        width: 54px;
-        height: 54px;
-        border-radius: 50%;
-        background: #4a9eff;
-        color: #fff;
-        font-size: 1.4rem;
-        border: none;
-        cursor: pointer;
-        box-shadow: 0 4px 18px rgba(74,158,255,0.45);
-        z-index: 500;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s, transform 0.2s;
+        position:fixed; bottom:28px; right:28px; width:54px; height:54px;
+        border-radius:50%; background:#4a9eff; color:#fff; font-size:1.4rem;
+        border:none; cursor:pointer; box-shadow:0 4px 18px rgba(74,158,255,0.45);
+        z-index:500; display:flex; align-items:center; justify-content:center;
+        transition:background .2s, transform .2s;
       }
-      #ai-fab:hover { background: #2d7dd2; transform: scale(1.08); }
-      #ai-fab.open  { background: #2d7dd2; }
+      #ai-fab:hover { background:#2d7dd2; transform:scale(1.08); }
+      #ai-fab.open  { background:#2d7dd2; }
 
-      /* 聊天視窗 */
+      /* ── 聊天視窗 ── */
       #ai-chat-window {
-        position: fixed;
-        bottom: 96px;
-        right: 28px;
-        width: 360px;
-        max-height: 560px;
-        background: #fff;
-        border-radius: 16px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-        border: 1px solid #e2e8f0;
-        display: none;
-        flex-direction: column;
-        z-index: 499;
-        overflow: hidden;
+        position:fixed; bottom:96px; right:28px; width:360px; max-height:580px;
+        background:#fff; border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.15);
+        border:1px solid #e2e8f0; display:none; flex-direction:column; z-index:499; overflow:hidden;
       }
-      #ai-chat-window.open { display: flex; }
+      #ai-chat-window.open { display:flex; }
 
-      /* 模式切換 Tab */
+      /* ── Header ── */
+      #ai-chat-header {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:12px 14px; background:#1e3a5f; color:#fff; flex-shrink:0;
+      }
+      #ai-chat-header-left  { display:flex; align-items:center; gap:10px; }
+      #ai-chat-icon         { font-size:1.3rem; }
+      #ai-chat-title        { font-size:0.92rem; font-weight:700; line-height:1.2; }
+      #ai-chat-context      { font-size:0.7rem; color:rgba(255,255,255,0.6); margin-top:1px; }
+      #ai-chat-header-right { display:flex; gap:5px; }
+      #ai-chat-header-right button {
+        background:rgba(255,255,255,0.15); border:none; color:#fff;
+        width:28px; height:28px; border-radius:6px; cursor:pointer;
+        font-size:0.85rem; display:flex; align-items:center; justify-content:center;
+        transition:background .15s;
+      }
+      #ai-chat-header-right button:hover { background:rgba(255,255,255,0.28); }
+
+      /* ── 話題選擇 ── */
+      #ai-topic-picker {
+        padding:14px 14px 10px;
+        border-bottom:1px solid #e2e8f0;
+        flex-shrink:0;
+        background:#f8fafc;
+      }
+      #ai-topic-picker-title {
+        font-size:0.8rem; font-weight:700; color:#5a6a7e;
+        text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;
+      }
+      .ai-topic-choice {
+        display:flex; align-items:center; gap:12px;
+        width:100%; padding:10px 12px; border-radius:10px;
+        border:1.5px solid #e2e8f0; background:#fff; cursor:pointer;
+        text-align:left; margin-bottom:8px;
+        transition:border-color .15s, background .15s;
+      }
+      .ai-topic-choice:hover { border-color:#4a9eff; background:#f0f7ff; }
+      .ai-topic-choice-icon  { font-size:1.4rem; flex-shrink:0; }
+      .ai-topic-choice-label { font-size:0.88rem; font-weight:600; color:#1a2332; }
+      .ai-topic-choice-sub   { font-size:0.75rem; color:#94a3b8; margin-top:2px; }
+
+      /* ── Tab ── */
       #ai-view-tabs {
-        display: flex;
-        border-bottom: 1px solid #e2e8f0;
-        background: #f8fafc;
-        flex-shrink: 0;
+        display:flex; border-bottom:1px solid #e2e8f0;
+        background:#f8fafc; flex-shrink:0;
       }
       .ai-tab {
-        flex: 1;
-        padding: 8px 0;
-        font-size: 0.82rem;
-        font-weight: 600;
-        border: none;
-        background: none;
-        cursor: pointer;
-        color: #94a3b8;
-        border-bottom: 2px solid transparent;
-        transition: color 0.15s, border-color 0.15s;
+        flex:1; padding:8px 0; font-size:0.82rem; font-weight:600;
+        border:none; background:none; cursor:pointer; color:#94a3b8;
+        border-bottom:2px solid transparent; transition:color .15s, border-color .15s;
       }
-      .ai-tab.active {
-        color: #4a9eff;
-        border-bottom-color: #4a9eff;
-        background: #fff;
-      }
+      .ai-tab.active { color:#4a9eff; border-bottom-color:#4a9eff; background:#fff; }
 
-      /* Header */
-      #ai-chat-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 16px;
-        background: #1e3a5f;
-        color: #fff;
-        flex-shrink: 0;
-      }
-      #ai-chat-header-left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      #ai-chat-icon { font-size: 1.4rem; }
-      #ai-chat-title {
-        font-size: 0.95rem;
-        font-weight: 700;
-        line-height: 1.2;
-      }
-      #ai-chat-context {
-        font-size: 0.72rem;
-        color: rgba(255,255,255,0.65);
-        margin-top: 1px;
-      }
-      #ai-chat-header-right {
-        display: flex;
-        gap: 6px;
-      }
-      #ai-chat-header-right button {
-        background: rgba(255,255,255,0.15);
-        border: none;
-        color: #fff;
-        width: 28px;
-        height: 28px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.85rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.15s;
-      }
-      #ai-chat-header-right button:hover { background: rgba(255,255,255,0.28); }
-
-      /* 訊息區 */
+      /* ── 訊息區 ── */
       #ai-chat-messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 14px 14px 8px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        min-height: 100px;
+        flex:1; overflow-y:auto; padding:12px 12px 6px;
+        display:flex; flex-direction:column; gap:8px; min-height:80px;
       }
       .ai-msg {
-        max-width: 85%;
-        padding: 9px 13px;
-        border-radius: 12px;
-        font-size: 0.875rem;
-        line-height: 1.55;
-        word-break: break-word;
-        white-space: pre-wrap;
+        max-width:86%; padding:9px 13px; border-radius:12px;
+        font-size:0.875rem; line-height:1.55; word-break:break-word; white-space:pre-wrap;
       }
-      .ai-msg.user {
-        align-self: flex-end;
-        background: #4a9eff;
-        color: #fff;
-        border-bottom-right-radius: 4px;
-      }
-      .ai-msg.model {
-        align-self: flex-start;
-        background: #f1f5f9;
-        color: #1a2332;
-        border-bottom-left-radius: 4px;
-      }
-      .ai-msg.loading {
-        align-self: flex-start;
-        background: #f1f5f9;
-        color: #94a3b8;
-      }
-      .ai-msg.error {
-        align-self: flex-start;
-        background: #fee2e2;
-        color: #b91c1c;
-      }
+      .ai-msg.user  { align-self:flex-end; background:#4a9eff; color:#fff; border-bottom-right-radius:4px; }
+      .ai-msg.model { align-self:flex-start; background:#f1f5f9; color:#1a2332; border-bottom-left-radius:4px; }
+      .ai-msg.loading { align-self:flex-start; background:#f1f5f9; color:#94a3b8; }
+      .ai-msg.error   { align-self:flex-start; background:#fee2e2; color:#b91c1c; }
 
-      /* 日期分隔線（歷史模式用） */
+      /* 日期分隔 */
       .ai-date-divider {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.72rem;
-        color: #94a3b8;
-        margin: 8px 0 4px;
+        display:flex; align-items:center; gap:8px;
+        font-size:0.7rem; color:#94a3b8; margin:6px 0 2px;
       }
-      .ai-date-divider::before,
-      .ai-date-divider::after {
-        content: '';
-        flex: 1;
-        height: 1px;
-        background: #e2e8f0;
+      .ai-date-divider::before, .ai-date-divider::after {
+        content:''; flex:1; height:1px; background:#e2e8f0;
       }
 
       /* 空狀態 */
       #ai-chat-welcome {
-        text-align: center;
-        padding: 24px 12px;
-        color: #94a3b8;
-        font-size: 0.85rem;
+        text-align:center; padding:20px 12px; color:#94a3b8; font-size:0.85rem;
       }
-      #ai-chat-welcome .welcome-icon { font-size: 2rem; margin-bottom: 8px; }
+      #ai-chat-welcome .welcome-icon { font-size:2rem; margin-bottom:8px; }
 
-      /* 未設定 Key */
+      /* ── 未設定 Key ── */
       #ai-no-key {
-        display: none;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 32px 20px;
-        text-align: center;
-        flex: 1;
-        color: #5a6a7e;
-        font-size: 0.88rem;
+        display:none; flex-direction:column; align-items:center; justify-content:center;
+        padding:32px 20px; text-align:center; flex:1; color:#5a6a7e; font-size:0.88rem;
       }
-      #ai-no-key p { margin-bottom: 12px; }
+      #ai-no-key p { margin-bottom:12px; }
       #ai-go-settings {
-        background: #4a9eff;
-        color: #fff;
-        padding: 8px 18px;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        text-decoration: none;
-        transition: background 0.15s;
+        background:#4a9eff; color:#fff; padding:8px 18px; border-radius:8px;
+        font-size:0.85rem; font-weight:600; text-decoration:none; transition:background .15s;
       }
-      #ai-go-settings:hover { background: #2d7dd2; }
+      #ai-go-settings:hover { background:#2d7dd2; }
 
-      /* 輸入區 */
+      /* ── 輸入區 ── */
       #ai-chat-input-area {
-        display: flex;
-        align-items: flex-end;
-        gap: 8px;
-        padding: 10px 12px;
-        border-top: 1px solid #e2e8f0;
-        background: #f8fafc;
-        flex-shrink: 0;
+        display:none; flex-direction:column;
+        border-top:1px solid #e2e8f0; background:#f8fafc; flex-shrink:0;
+      }
+      #ai-topic-label-bar {
+        padding:5px 12px 0;
+        font-size:0.72rem; color:#94a3b8;
+      }
+      #ai-topic-label-text { font-style:italic; }
+      #ai-input-row {
+        display:flex; align-items:flex-end; gap:8px; padding:8px 12px 10px;
       }
       #ai-chat-input {
-        flex: 1;
-        border: 1.5px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 8px 12px;
-        font-size: 0.875rem;
-        resize: none;
-        font-family: inherit;
-        line-height: 1.5;
-        max-height: 100px;
-        overflow-y: auto;
-        background: #fff;
-        color: #1a2332;
-        transition: border-color 0.15s;
+        flex:1; border:1.5px solid #e2e8f0; border-radius:10px;
+        padding:8px 12px; font-size:0.875rem; resize:none; font-family:inherit;
+        line-height:1.5; max-height:100px; overflow-y:auto;
+        background:#fff; color:#1a2332; transition:border-color .15s;
       }
-      #ai-chat-input:focus {
-        outline: none;
-        border-color: #4a9eff;
-        box-shadow: 0 0 0 3px rgba(74,158,255,0.12);
-      }
+      #ai-chat-input:focus { outline:none; border-color:#4a9eff; box-shadow:0 0 0 3px rgba(74,158,255,0.12); }
       #ai-chat-send {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        background: #4a9eff;
-        color: #fff;
-        border: none;
-        cursor: pointer;
-        font-size: 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        transition: background 0.15s;
+        width:36px; height:36px; border-radius:10px; background:#4a9eff;
+        color:#fff; border:none; cursor:pointer; font-size:1rem;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+        transition:background .15s;
       }
-      #ai-chat-send:hover    { background: #2d7dd2; }
-      #ai-chat-send:disabled { background: #94a3b8; cursor: not-allowed; }
+      #ai-chat-send:hover    { background:#2d7dd2; }
+      #ai-chat-send:disabled { background:#94a3b8; cursor:not-allowed; }
 
-      /* 手機版全屏 */
-      @media (max-width: 480px) {
-        #ai-chat-window {
-          bottom: 0;
-          right: 0;
-          width: 100%;
-          max-height: 80vh;
-          border-radius: 16px 16px 0 0;
+      /* ── 歷史面板 ── */
+      #ai-history-panel {
+        display:none; position:fixed; bottom:96px; right:28px;
+        width:360px; max-height:580px; background:#fff;
+        border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.18);
+        border:1px solid #e2e8f0; flex-direction:column; z-index:600; overflow:hidden;
+      }
+      #ai-history-panel.open { display:flex; }
+      #ai-history-header {
+        display:flex; justify-content:space-between; align-items:center;
+        padding:12px 16px; background:#1e3a5f; color:#fff; font-size:0.92rem; flex-shrink:0;
+      }
+      #ai-history-close {
+        background:rgba(255,255,255,0.15); border:none; color:#fff;
+        width:28px; height:28px; border-radius:6px; cursor:pointer; font-size:0.9rem;
+        display:flex; align-items:center; justify-content:center;
+      }
+      #ai-history-close:hover { background:rgba(255,255,255,0.28); }
+      #ai-history-list {
+        flex:1; overflow-y:auto; padding:10px 12px;
+      }
+      /* 話題區塊 */
+      .ai-history-topic {
+        border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden;
+      }
+      .ai-history-topic-header {
+        display:flex; justify-content:space-between; align-items:center;
+        padding:9px 12px; background:#f8fafc; cursor:pointer;
+        transition:background .15s;
+      }
+      .ai-history-topic-header:hover { background:#eef2ff; }
+      .ai-history-topic-title { font-size:0.85rem; font-weight:600; color:#1a2332; }
+      .ai-history-topic-meta  { font-size:0.72rem; color:#94a3b8; margin-top:2px; }
+      .ai-history-topic-actions { display:flex; gap:5px; }
+      .ai-history-topic-btn {
+        font-size:0.75rem; padding:3px 8px; border-radius:6px; border:none; cursor:pointer;
+        font-weight:600; transition:background .15s;
+      }
+      .ai-history-topic-btn.load   { background:#dbeafe; color:#1d4ed8; }
+      .ai-history-topic-btn.load:hover { background:#bfdbfe; }
+      .ai-history-topic-btn.del    { background:#fee2e2; color:#b91c1c; }
+      .ai-history-topic-btn.del:hover  { background:#fecaca; }
+      .ai-history-topic-msgs {
+        display:none; padding:8px 10px; border-top:1px solid #e2e8f0;
+        background:#fff; max-height:200px; overflow-y:auto;
+      }
+      .ai-history-topic-msgs.open { display:block; }
+      .ai-history-topic-preview {
+        font-size:0.8rem; padding:4px 0; border-bottom:1px solid #f1f5f9;
+        color:#5a6a7e; line-height:1.45;
+      }
+      .ai-history-topic-preview:last-child { border-bottom:none; }
+      .ai-history-topic-preview .role-badge {
+        font-size:0.68rem; font-weight:700; margin-right:4px;
+        padding:1px 5px; border-radius:4px;
+      }
+      .ai-history-topic-preview .role-badge.u { background:#dbeafe; color:#1d4ed8; }
+      .ai-history-topic-preview .role-badge.m { background:#dcfce7; color:#15803d; }
+
+      /* 空歷史 */
+      .ai-history-empty {
+        text-align:center; padding:32px 16px; color:#94a3b8; font-size:0.85rem;
+      }
+      .ai-history-empty-icon { font-size:2rem; margin-bottom:8px; }
+
+      /* 手機版 */
+      @media (max-width:480px) {
+        #ai-chat-window, #ai-history-panel {
+          bottom:0; right:0; width:100%; max-height:80vh; border-radius:16px 16px 0 0;
         }
-        #ai-fab { bottom: 20px; right: 20px; }
+        #ai-fab { bottom:20px; right:20px; }
       }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(s);
   }
 
   /* ===========================
      事件綁定
      =========================== */
   function bindEvents() {
-    const fab        = document.getElementById('ai-fab');
-    const win        = document.getElementById('ai-chat-window');
-    const closeBtn   = document.getElementById('ai-chat-close');
-    const clearBtn   = document.getElementById('ai-chat-clear');
-    const historyBtn = document.getElementById('ai-chat-history-btn');
-    const sendBtn    = document.getElementById('ai-chat-send');
-    const input      = document.getElementById('ai-chat-input');
-
-    // 開關聊天視窗
-    fab.addEventListener('click', () => toggleWindow());
-    closeBtn.addEventListener('click', () => closeWindow());
+    document.getElementById('ai-fab').addEventListener('click', toggleWindow);
+    document.getElementById('ai-chat-close').addEventListener('click', closeWindow);
 
     // ESC 關閉
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && win.classList.contains('open')) closeWindow();
+      if (e.key === 'Escape') {
+        if (document.getElementById('ai-history-panel').classList.contains('open')) closeHistoryPanel();
+        else if (document.getElementById('ai-chat-window').classList.contains('open')) closeWindow();
+      }
     });
 
-    // 清除所有歷史
-    clearBtn.addEventListener('click', () => {
-      if (!confirm('確定要清除所有對話歷史？此動作無法復原。')) return;
-      saveHistory([]);
-      currentSession = [];
-      renderMessages();
-    });
-
-    // 歷史快捷鍵（切換到歷史 Tab）
-    historyBtn.addEventListener('click', () => switchView('history'));
+    // 話題選擇
+    document.getElementById('ai-pick-new').addEventListener('click', () => startNewTopic());
+    document.getElementById('ai-pick-continue').addEventListener('click', () => continueLastTopic());
 
     // Tab 切換
     document.getElementById('ai-view-tabs').addEventListener('click', e => {
@@ -494,33 +417,22 @@
       switchView(tab.dataset.view);
     });
 
-    // 送出訊息
-    sendBtn.addEventListener('click', sendMessage);
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
+    // 新話題按鈕（聊天中途開新話題）
+    document.getElementById('ai-new-topic-btn').addEventListener('click', () => showTopicPicker());
 
-    // 自動調整輸入框高度
-    input.addEventListener('input', () => {
-      input.style.height = 'auto';
-      input.style.height = Math.min(input.scrollHeight, 100) + 'px';
-    });
-  }
+    // 歷史面板
+    document.getElementById('ai-chat-history-btn').addEventListener('click', openHistoryPanel);
+    document.getElementById('ai-history-close').addEventListener('click', closeHistoryPanel);
 
-  /* ===========================
-     模式切換（目前對話 / 全部歷史）
-     =========================== */
-  function switchView(mode) {
-    viewMode = mode;
-    document.querySelectorAll('.ai-tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.view === mode));
-    // 歷史模式隱藏輸入框
-    const inputArea = document.getElementById('ai-chat-input-area');
-    if (inputArea) inputArea.style.display = mode === 'history' ? 'none' : 'flex';
-    renderMessages();
+    // 送出
+    document.getElementById('ai-chat-send').addEventListener('click', sendMessage);
+    document.getElementById('ai-chat-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+    document.getElementById('ai-chat-input').addEventListener('input', function () {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+    });
   }
 
   /* ===========================
@@ -528,52 +440,143 @@
      =========================== */
   function toggleWindow() {
     const win = document.getElementById('ai-chat-window');
+    win.classList.contains('open') ? closeWindow() : openWindow();
+  }
+
+  function openWindow() {
+    const win = document.getElementById('ai-chat-window');
     const fab = document.getElementById('ai-fab');
-    if (win.classList.contains('open')) {
-      closeWindow();
+    win.classList.add('open');
+    win.setAttribute('aria-hidden', 'false');
+    fab.classList.add('open');
+    fab.textContent = '✕';
+    updateContext();
+    checkApiKey();
+    // 若無 activeTopicId 或剛初始化 → 顯示話題選擇器
+    if (!activeTopicId) {
+      showTopicPicker();
     } else {
-      win.classList.add('open');
-      win.setAttribute('aria-hidden', 'false');
-      fab.classList.add('open');
-      fab.textContent = '✕';
-      updateContext();
-      checkApiKey();
+      hideTopicPicker();
+      renderMessages();
       scrollToBottom();
       document.getElementById('ai-chat-input').focus();
     }
   }
 
   function closeWindow() {
-    const win = document.getElementById('ai-chat-window');
+    document.getElementById('ai-chat-window').classList.remove('open');
+    document.getElementById('ai-chat-window').setAttribute('aria-hidden', 'true');
     const fab = document.getElementById('ai-fab');
-    win.classList.remove('open');
-    win.setAttribute('aria-hidden', 'true');
     fab.classList.remove('open');
     fab.textContent = '💬';
   }
 
   /* ===========================
-     情境標籤更新
+     話題選擇器
+     =========================== */
+  function showTopicPicker() {
+    // 更新「延續上次」說明
+    const topics = loadTopics();
+    const last   = topics[topics.length - 1];
+    const subEl  = document.getElementById('ai-last-topic-sub');
+    if (last) {
+      const d = new Date(last.createdAt).toLocaleDateString('zh-TW', { month:'long', day:'numeric' });
+      const msgs = loadHistory().filter(m => m.topicId === last.id);
+      subEl.textContent = `${d} · ${last.title || '未命名話題'} (${Math.floor(msgs.length/2)} 輪對話)`;
+      document.getElementById('ai-pick-continue').disabled = false;
+    } else {
+      subEl.textContent = '尚無歷史話題';
+      document.getElementById('ai-pick-continue').disabled = true;
+    }
+    document.getElementById('ai-topic-picker').style.display = 'block';
+    document.getElementById('ai-view-tabs').style.display = 'none';
+    document.getElementById('ai-chat-messages').style.display = 'none';
+    document.getElementById('ai-chat-input-area').style.display = 'none';
+  }
+
+  function hideTopicPicker() {
+    document.getElementById('ai-topic-picker').style.display = 'none';
+    document.getElementById('ai-view-tabs').style.display = 'flex';
+    document.getElementById('ai-chat-messages').style.display = 'flex';
+    document.getElementById('ai-chat-input-area').style.display = 'flex';
+  }
+
+  function startNewTopic() {
+    const id    = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const topic = {
+      id, title: '',
+      createdAt: new Date().toISOString(),
+      page: getCurrentPage()
+    };
+    const topics = loadTopics();
+    topics.push(topic);
+    saveTopics(topics);
+    activeTopicId = id;
+    isNewTopic    = true;
+    hideTopicPicker();
+    switchView('chat');
+    updateTopicLabel('新對話');
+    document.getElementById('ai-chat-messages').innerHTML = `
+      <div id="ai-chat-welcome">
+        <div class="welcome-icon">✨</div>
+        <p>新話題已開始！</p>
+        <p>請輸入你的問題～</p>
+      </div>`;
+    document.getElementById('ai-chat-input').focus();
+  }
+
+  function continueLastTopic() {
+    const topics = loadTopics();
+    const last   = topics[topics.length - 1];
+    if (!last) return;
+    activeTopicId = last.id;
+    isNewTopic    = false;
+    hideTopicPicker();
+    switchView('chat');
+    updateTopicLabel(last.title || '延續上次話題');
+    renderMessages();
+    scrollToBottom();
+    document.getElementById('ai-chat-input').focus();
+  }
+
+  /* ===========================
+     Tab 切換
+     =========================== */
+  function switchView(mode) {
+    viewMode = mode;
+    document.querySelectorAll('.ai-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.view === mode));
+    const inputArea = document.getElementById('ai-chat-input-area');
+    if (inputArea) inputArea.style.display = mode === 'history' ? 'none' : 'flex';
+    renderMessages();
+  }
+
+  /* ===========================
+     情境標籤
      =========================== */
   function updateContext() {
-    const ctx     = document.getElementById('ai-chat-context');
-    const page    = getCurrentPage();
-    const subject = getCurrentSubject();
-    ctx.textContent = subject ? `${page} · ${subject}` : page;
+    const ctx = document.getElementById('ai-chat-context');
+    const sub = getCurrentSubject();
+    ctx.textContent = sub ? `${getCurrentPage()} · ${sub}` : getCurrentPage();
+  }
+
+  function updateTopicLabel(text) {
+    const el = document.getElementById('ai-topic-label-text');
+    if (el) el.textContent = `話題：${text}`;
   }
 
   /* ===========================
      API Key 檢查
      =========================== */
   function checkApiKey() {
-    const hasKey   = !!getApiKey();
-    const noKeyEl  = document.getElementById('ai-no-key');
-    const inputArea = document.getElementById('ai-chat-input-area');
-    const messages  = document.getElementById('ai-chat-messages');
-
-    noKeyEl.style.display   = hasKey ? 'none'  : 'flex';
-    inputArea.style.display = hasKey ? 'flex'  : 'none';
-    messages.style.display  = hasKey ? 'flex'  : 'none';
+    const hasKey = !!getApiKey();
+    document.getElementById('ai-no-key').style.display  = hasKey ? 'none' : 'flex';
+    if (!hasKey) {
+      document.getElementById('ai-topic-picker').style.display    = 'none';
+      document.getElementById('ai-view-tabs').style.display       = 'none';
+      document.getElementById('ai-chat-messages').style.display   = 'none';
+      document.getElementById('ai-chat-input-area').style.display = 'none';
+    }
   }
 
   /* ===========================
@@ -582,15 +585,16 @@
   function renderMessages() {
     const container = document.getElementById('ai-chat-messages');
     if (viewMode === 'history') {
-      renderHistory(container);
+      renderHistoryInChat(container);
     } else {
-      renderCurrentSession(container);
+      renderTopicMessages(container);
     }
   }
 
-  /** 渲染當前對話（本次開啟視窗後的訊息） */
-  function renderCurrentSession(container) {
-    if (currentSession.length === 0) {
+  function renderTopicMessages(container) {
+    if (!activeTopicId) { container.innerHTML = ''; return; }
+    const msgs = loadHistory().filter(m => m.topicId === activeTopicId);
+    if (msgs.length === 0) {
       container.innerHTML = `
         <div id="ai-chat-welcome">
           <div class="welcome-icon">🤖</div>
@@ -599,38 +603,32 @@
         </div>`;
       return;
     }
-    container.innerHTML = currentSession.map(m => `
+    container.innerHTML = msgs.map(m => `
       <div class="ai-msg ${m.role === 'user' ? 'user' : 'model'}">
         ${escapeHtml(m.text)}
       </div>`).join('');
     scrollToBottom();
   }
 
-  /** 渲染全部歷史（依日期分組） */
-  function renderHistory(container) {
+  function renderHistoryInChat(container) {
     const history = loadHistory();
     if (history.length === 0) {
       container.innerHTML = `
         <div id="ai-chat-welcome">
           <div class="welcome-icon">🕘</div>
           <p>尚無對話歷史記錄</p>
+          <p style="font-size:0.8rem;">每次對話都會自動儲存。</p>
         </div>`;
       return;
     }
     let lastDate = '';
     container.innerHTML = history.map(m => {
-      const dateStr = m.timestamp
-        ? new Date(m.timestamp).toLocaleDateString('zh-TW',
-            { year: 'numeric', month: 'long', day: 'numeric' })
+      const d = m.timestamp
+        ? new Date(m.timestamp).toLocaleDateString('zh-TW', { year:'numeric', month:'long', day:'numeric' })
         : '未知日期';
       let html = '';
-      if (dateStr !== lastDate) {
-        html += `<div class="ai-date-divider">${dateStr}</div>`;
-        lastDate = dateStr;
-      }
-      html += `<div class="ai-msg ${m.role === 'user' ? 'user' : 'model'}">
-        ${escapeHtml(m.text)}
-      </div>`;
+      if (d !== lastDate) { html += `<div class="ai-date-divider">${d}</div>`; lastDate = d; }
+      html += `<div class="ai-msg ${m.role === 'user' ? 'user' : 'model'}">${escapeHtml(m.text)}</div>`;
       return html;
     }).join('');
     scrollToBottom();
@@ -638,10 +636,7 @@
 
   function appendMessage(role, text, isLoading = false) {
     const container = document.getElementById('ai-chat-messages');
-    // 移除歡迎訊息
-    const welcome = document.getElementById('ai-chat-welcome');
-    if (welcome) welcome.remove();
-
+    document.getElementById('ai-chat-welcome')?.remove();
     const div = document.createElement('div');
     div.className = `ai-msg ${isLoading ? 'loading' : role === 'user' ? 'user' : 'model'}`;
     div.textContent = text;
@@ -656,11 +651,7 @@
   }
 
   function escapeHtml(str) {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   /* ===========================
@@ -670,52 +661,142 @@
     const input   = document.getElementById('ai-chat-input');
     const sendBtn = document.getElementById('ai-chat-send');
     const text    = input.value.trim();
-    if (!text) return;
+    if (!text || !activeTopicId) return;
 
-    // 清空輸入
     input.value = '';
     input.style.height = 'auto';
-
-    // 顯示使用者訊息
     appendMessage('user', text);
-
-    // 顯示 loading
     const loadingEl = appendMessage('model', '思考中…', true);
     sendBtn.disabled = true;
 
-    // 讀取歷史
-    const history = loadHistory();
+    // 只傳入本話題的歷史
+    const topicHistory = loadHistory().filter(m => m.topicId === activeTopicId);
 
     try {
-      updateContext(); // 取得最新情境
-      const reply = await callGemini(text, history);
-
-      // 移除 loading
+      updateContext();
+      const reply = await callGemini(text, topicHistory);
       loadingEl.remove();
-
-      // 顯示 AI 回覆（加入當前對話）
-      const now = new Date().toISOString();
-      currentSession.push({ role: 'user',  text, timestamp: now });
-      currentSession.push({ role: 'model', text: reply, timestamp: now });
       appendMessage('model', reply);
 
-      // 儲存至全部歷史
-      history.push({ role: 'user',  text, timestamp: now });
-      history.push({ role: 'model', text: reply, timestamp: now });
+      const now = new Date().toISOString();
+      const history = loadHistory();
+      history.push({ topicId: activeTopicId, role:'user',  text, timestamp: now });
+      history.push({ topicId: activeTopicId, role:'model', text: reply, timestamp: now });
       saveHistory(history);
+
+      // 自動以第一句問題做話題標題
+      const topics = loadTopics();
+      const idx = topics.findIndex(t => t.id === activeTopicId);
+      if (idx !== -1 && !topics[idx].title) {
+        topics[idx].title = text.slice(0, 30) + (text.length > 30 ? '…' : '');
+        saveTopics(topics);
+        updateTopicLabel(topics[idx].title);
+      }
 
     } catch (err) {
       loadingEl.remove();
-      if (err.message === 'NO_KEY') {
-        checkApiKey(); // 顯示設定提示
-      } else {
-        const errDiv = appendMessage('model', `❌ 錯誤：${err.message}`);
-        errDiv.classList.add('error');
+      if (err.message === 'NO_KEY') { checkApiKey(); }
+      else {
+        const d = appendMessage('model', `❌ 錯誤：${err.message}`);
+        d.classList.add('error');
       }
     } finally {
       sendBtn.disabled = false;
       document.getElementById('ai-chat-input').focus();
     }
+  }
+
+  /* ===========================
+     歷史面板（話題列表）
+     =========================== */
+  function openHistoryPanel() {
+    renderHistoryPanel();
+    document.getElementById('ai-history-panel').classList.add('open');
+  }
+
+  function closeHistoryPanel() {
+    document.getElementById('ai-history-panel').classList.remove('open');
+  }
+
+  function renderHistoryPanel() {
+    const topics  = loadTopics();
+    const history = loadHistory();
+    const list    = document.getElementById('ai-history-list');
+
+    if (topics.length === 0) {
+      list.innerHTML = `
+        <div class="ai-history-empty">
+          <div class="ai-history-empty-icon">🕘</div>
+          <p>尚無對話記錄</p>
+        </div>`;
+      return;
+    }
+
+    // 由新到舊
+    list.innerHTML = [...topics].reverse().map(topic => {
+      const msgs   = history.filter(m => m.topicId === topic.id);
+      const date   = new Date(topic.createdAt).toLocaleDateString('zh-TW',
+                       { year:'numeric', month:'long', day:'numeric' });
+      const title  = topic.title || '未命名話題';
+      const rounds = Math.floor(msgs.length / 2);
+      const isCurrent = topic.id === activeTopicId;
+
+      const previews = msgs.slice(0, 4).map(m => `
+        <div class="ai-history-topic-preview">
+          <span class="role-badge ${m.role === 'user' ? 'u' : 'm'}">
+            ${m.role === 'user' ? '我' : 'AI'}
+          </span>${escapeHtml(m.text.slice(0, 60))}${m.text.length > 60 ? '…' : ''}
+        </div>`).join('');
+
+      return `
+        <div class="ai-history-topic" id="topic-block-${topic.id}">
+          <div class="ai-history-topic-header" onclick="document.getElementById('topic-msgs-${topic.id}').classList.toggle('open')">
+            <div>
+              <div class="ai-history-topic-title">
+                ${isCurrent ? '🟢 ' : ''}${escapeHtml(title)}
+              </div>
+              <div class="ai-history-topic-meta">${date} · ${topic.page || ''} · ${rounds} 輪對話</div>
+            </div>
+            <div class="ai-history-topic-actions">
+              <button class="ai-history-topic-btn load" onclick="event.stopPropagation(); loadTopic('${topic.id}')">載入</button>
+              <button class="ai-history-topic-btn del"  onclick="event.stopPropagation(); deleteTopic('${topic.id}')">刪除</button>
+            </div>
+          </div>
+          <div class="ai-history-topic-msgs" id="topic-msgs-${topic.id}">
+            ${previews || '<div style="font-size:0.8rem;color:#94a3b8;padding:6px 0;">（無訊息）</div>'}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function loadTopic(topicId) {
+    const topics = loadTopics();
+    const topic  = topics.find(t => t.id === topicId);
+    if (!topic) return;
+    activeTopicId = topicId;
+    isNewTopic    = false;
+    updateTopicLabel(topic.title || '歷史話題');
+    closeHistoryPanel();
+    hideTopicPicker();
+    switchView('chat');
+    renderMessages();
+    scrollToBottom();
+    document.getElementById('ai-chat-input').focus();
+  }
+
+  function deleteTopic(topicId) {
+    if (!confirm('確定要刪除這個話題及其所有訊息？')) return;
+    // 刪除話題
+    saveTopics(loadTopics().filter(t => t.id !== topicId));
+    // 刪除相關訊息
+    saveHistory(loadHistory().filter(m => m.topicId !== topicId));
+    // 若刪的是當前話題，重置
+    if (activeTopicId === topicId) {
+      activeTopicId = null;
+      updateTopicLabel('新對話');
+    }
+    renderHistoryPanel();
+    renderMessages();
   }
 
   /* ===========================
@@ -727,10 +808,16 @@
     injectWidget();
   }
 
-  // 移除原本 HTML 中的靜態 ai-fab（避免重複）
+  // 移除靜態 ai-fab-btn（若存在）
   document.addEventListener('DOMContentLoaded', () => {
-    const staticFab = document.getElementById('ai-fab-btn');
-    if (staticFab) staticFab.remove();
+    document.getElementById('ai-fab-btn')?.remove();
   });
 
+  // 將 loadTopic / deleteTopic 掛載到 window（供 HTML onclick 呼叫）
+  window._aiChat = { loadTopic, deleteTopic };
+
 })();
+
+// 全域代理（ai-history-panel 內的 onclick 需要存取）
+function loadTopic(id)   { window._aiChat.loadTopic(id); }
+function deleteTopic(id) { window._aiChat.deleteTopic(id); }
