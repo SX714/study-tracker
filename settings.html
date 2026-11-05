@@ -6,6 +6,44 @@
   <title>設定 — Study Tracker</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
+    /* 外觀設定 — 主題切換 radio group */
+    .theme-options {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .theme-option {
+      flex: 1;
+      min-width: 120px;
+    }
+    .theme-option input[type="radio"] {
+      display: none;
+    }
+    .theme-option label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 14px 10px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      transition: border-color var(--transition), background var(--transition), color var(--transition);
+      text-align: center;
+    }
+    .theme-option label .theme-icon { font-size: 1.5rem; }
+    .theme-option input[type="radio"]:checked + label {
+      border-color: var(--accent);
+      background: var(--surface);
+      color: var(--text);
+    }
+    .theme-option label:hover {
+      border-color: var(--accent);
+    }
     .settings-section {
       background: var(--surface);
       border-radius: var(--radius);
@@ -66,6 +104,19 @@
   </style>
 </head>
 <body>
+  <script>
+    /* 防閃爍：在 body 最頂端立即套用主題 */
+    (function() {
+      try {
+        var s = localStorage.getItem('st_settings');
+        var mode = s ? (JSON.parse(s).themeMode || 'system') : 'system';
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (mode === 'dark' || (mode === 'system' && prefersDark)) {
+          document.body.classList.add('dark');
+        }
+      } catch(e) {}
+    })();
+  </script>
 
   <nav class="navbar">
     <a href="index.html" class="nav-brand">
@@ -77,7 +128,8 @@
       <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
       <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
       <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
-      <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
+      <li><a href="diary.html"><span class="nav-icon">📓</span> 日記</a></li>
+      <li><a href="settings.html" class="active"><span class="nav-icon">⚙️</span> 設定</a></li>
     </ul>
     <button class="nav-hamburger" aria-label="選單">
       <span></span><span></span><span></span>
@@ -142,6 +194,34 @@
       <button class="btn btn-primary mt-8" id="save-timer-btn">💾 儲存設定</button>
     </div>
 
+    <!-- 外觀設定 -->
+    <div class="settings-section">
+      <div class="settings-section-title">🎨 外觀設定</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        選擇介面的顯示主題。「跟隨系統」會自動依據作業系統設定切換。
+      </p>
+      <div class="theme-options" id="theme-options">
+        <div class="theme-option">
+          <input type="radio" name="theme-mode" id="theme-system" value="system">
+          <label for="theme-system">
+            <span class="theme-icon">🖥️</span>跟隨系統
+          </label>
+        </div>
+        <div class="theme-option">
+          <input type="radio" name="theme-mode" id="theme-light" value="light">
+          <label for="theme-light">
+            <span class="theme-icon">☀️</span>淺色模式
+          </label>
+        </div>
+        <div class="theme-option">
+          <input type="radio" name="theme-mode" id="theme-dark" value="dark">
+          <label for="theme-dark">
+            <span class="theme-icon">🌙</span>深色模式
+          </label>
+        </div>
+      </div>
+    </div>
+
     <!-- 資料管理 -->
     <div class="settings-section">
       <div class="settings-section-title">🗂 資料管理</div>
@@ -162,12 +242,61 @@
       <div id="import-result" style="display:none; margin-top:10px; font-size:0.85rem;
            padding:8px 12px; border-radius:8px;"></div>
     </div>
+
+    <!-- 雲端同步 -->
+    <div class="settings-section">
+      <div class="settings-section-title">☁️ 雲端同步</div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+        使用 Google 帳號登入，讓科目、學習記錄、目標與日記在多台裝置間同步。
+        需先在 <code style="font-size:0.82rem; background:var(--bg); padding:2px 5px; border-radius:4px;">js/firebase-sync.js</code>
+        設定你的 Firebase 專案金鑰。
+      </p>
+
+      <!-- 登入狀態標籤 -->
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+        <span style="font-size:0.85rem; color:var(--text-muted);">登入狀態：</span>
+        <span class="sync-status-badge" id="sync-status">尚未登入</span>
+      </div>
+
+      <!-- 未登入：顯示登入按鈕 -->
+      <div id="sync-logged-out">
+        <button class="btn sync-btn-google" id="sync-login-btn">
+          <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.566 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+            <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+            <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+          </svg>
+          使用 Google 帳號登入
+        </button>
+      </div>
+
+      <!-- 已登入：顯示使用者資訊與操作按鈕 -->
+      <div id="sync-logged-in" style="display:none;">
+        <div class="sync-user-card">
+          <img id="sync-user-avatar" class="sync-avatar" src="" alt="頭像" style="display:none;">
+          <div class="sync-user-info">
+            <div class="sync-user-name" id="sync-user-name"></div>
+            <div class="sync-user-email" id="sync-user-email"></div>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+          <button class="btn btn-primary" id="sync-now-btn">🔄 立即同步</button>
+          <button class="btn btn-ghost" id="sync-logout-btn" style="color:var(--danger);">登出</button>
+        </div>
+        <div id="sync-result" class="sync-msg" style="display:none;"></div>
+      </div>
+    </div>
   </main>
 
   <footer>© 2025 Study Tracker — 純前端學習追蹤工具</footer>
   <button class="ai-fab" id="ai-fab-btn" title="AI 學習助理">💬</button>
 
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="js/utils.js"></script>
+  <script src="js/firebase-sync.js"></script>
   <script src="js/ai-chat.js"></script>
   <script>
     // 載入現有設定
@@ -180,6 +309,21 @@
     document.getElementById('s-short').value       = settings.shortBreakMinutes || 5;
     document.getElementById('s-long').value        = settings.longBreakMinutes || 15;
     document.getElementById('s-interval').value    = settings.longBreakInterval || 4;
+
+    // 初始化主題選項
+    const currentMode = settings.themeMode || 'system';
+    const themeRadio = document.querySelector(`input[name="theme-mode"][value="${currentMode}"]`);
+    if (themeRadio) themeRadio.checked = true;
+
+    // 主題切換
+    document.querySelectorAll('input[name="theme-mode"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const s = loadData('st_settings', {});
+        s.themeMode = radio.value;
+        saveData('st_settings', s);
+        initTheme();
+      });
+    });
 
     // 顯示/隱藏 Key
     document.getElementById('key-toggle').addEventListener('click', () => {
@@ -312,6 +456,34 @@
           localStorage.removeItem(k));
         alert('✅ 所有資料已清除，頁面將重新整理。');
         location.reload();
+      }
+    });
+
+    // 雲端同步：Google 登入
+    document.getElementById('sync-login-btn')?.addEventListener('click', () => {
+      signInWithGoogle();
+    });
+
+    // 雲端同步：登出
+    document.getElementById('sync-logout-btn')?.addEventListener('click', async () => {
+      await signOutUser();
+    });
+
+    // 雲端同步：立即同步
+    document.getElementById('sync-now-btn')?.addEventListener('click', async () => {
+      const user = window._firebaseUser;
+      if (!user) return;
+      const resultEl = document.getElementById('sync-result');
+      resultEl.style.display = 'block';
+      resultEl.className = 'sync-msg';
+      resultEl.textContent = '🔄 同步中…';
+      try {
+        await syncAllToFirestore(user.uid);
+        resultEl.className = 'sync-msg success';
+        resultEl.textContent = '✅ 同步完成！資料已上傳至雲端。';
+      } catch (e) {
+        resultEl.className = 'sync-msg error';
+        resultEl.textContent = `❌ 同步失敗：${e.message}`;
       }
     });
   </script>

@@ -95,6 +95,16 @@
   </style>
 </head>
 <body>
+  <script>
+    (function() {
+      try {
+        var s = localStorage.getItem('st_settings');
+        var mode = s ? (JSON.parse(s).themeMode || 'system') : 'system';
+        if (mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches))
+          document.body.classList.add('dark');
+      } catch(e) {}
+    })();
+  </script>
 
   <nav class="navbar">
     <a href="index.html" class="nav-brand">
@@ -103,9 +113,10 @@
     <ul class="nav-links">
       <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
       <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
-      <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
+      <li><a href="timer.html" class="active"><span class="nav-icon">⏱️</span> 計時器</a></li>
       <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
       <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
+      <li><a href="diary.html"><span class="nav-icon">📓</span> 日記</a></li>
       <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
     </ul>
     <button class="nav-hamburger" aria-label="選單">
@@ -168,7 +179,45 @@
   <footer>© 2025 Study Tracker — 純前端學習追蹤工具</footer>
   <button class="ai-fab" id="ai-fab-btn" title="AI 學習助理">💬</button>
 
+  <!-- 日記記錄 Modal -->
+  <div class="modal-backdrop" id="diary-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>📓 記錄學習心得</h2>
+        <button class="modal-close" id="diary-modal-close">✕</button>
+      </div>
+
+      <!-- 本次計時摘要 -->
+      <div class="diary-summary" id="diary-summary"></div>
+
+      <div class="form-group">
+        <label class="form-label">學習心得（選填）</label>
+        <textarea class="form-textarea" id="diary-content" rows="4" placeholder="今天學了什麼？有什麼想記錄的？"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">心情評分</label>
+        <div class="mood-stars" id="mood-stars">
+          <button class="mood-star" data-val="1" title="很差">★</button>
+          <button class="mood-star" data-val="2" title="不太好">★</button>
+          <button class="mood-star" data-val="3" title="普通">★</button>
+          <button class="mood-star" data-val="4" title="不錯">★</button>
+          <button class="mood-star" data-val="5" title="很棒">★</button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+        <button class="btn btn-ghost" id="diary-skip-btn">跳過</button>
+        <button class="btn btn-primary" id="diary-save-btn">💾 儲存日記</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="js/utils.js"></script>
+  <script src="js/firebase-sync.js"></script>
   <script src="js/ai-chat.js"></script>
   <script>
     // 設定讀取
@@ -281,6 +330,67 @@
       updateDisplay();
     }
 
+    // ── 日記 Modal ──────────────────────────────────────
+    let diaryMood = 3;
+    let pendingDiarySession = null; // { subjectId, subName, durationMinutes }
+
+    function openDiaryModal(subjectId, subName, durationMinutes) {
+      pendingDiarySession = { subjectId, subName, durationMinutes };
+      diaryMood = 3;
+
+      // 摘要區
+      document.getElementById('diary-summary').innerHTML =
+        `<div><strong>${subName}</strong></div>` +
+        `<div>⏱ ${formatMinutes(durationMinutes)}</div>`;
+
+      // 清空心得
+      document.getElementById('diary-content').value = '';
+
+      // 預設星星
+      updateMoodStars(3);
+
+      document.getElementById('diary-modal').classList.add('open');
+    }
+
+    function closeDiaryModal() {
+      document.getElementById('diary-modal').classList.remove('open');
+      pendingDiarySession = null;
+    }
+
+    function updateMoodStars(val) {
+      diaryMood = val;
+      document.querySelectorAll('#mood-stars .mood-star').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.dataset.val) <= val);
+      });
+    }
+
+    // 星星點擊
+    document.querySelectorAll('#mood-stars .mood-star').forEach(btn => {
+      btn.addEventListener('click', () => updateMoodStars(Number(btn.dataset.val)));
+    });
+
+    document.getElementById('diary-modal-close').addEventListener('click', closeDiaryModal);
+    document.getElementById('diary-skip-btn').addEventListener('click', closeDiaryModal);
+
+    document.getElementById('diary-save-btn').addEventListener('click', () => {
+      if (!pendingDiarySession) return;
+      const { subjectId, durationMinutes } = pendingDiarySession;
+      const content = document.getElementById('diary-content').value.trim();
+      const entry = {
+        id: generateId(),
+        sessionId: '',
+        subjectId,
+        content,
+        mood: diaryMood,
+        createdAt: new Date().toISOString()
+      };
+      const diary = loadData('st_diary', []);
+      diary.push(entry);
+      saveData('st_diary', diary);
+      closeDiaryModal();
+    });
+    // ── 日記 Modal 結束 ─────────────────────────────────
+
     function onPomodoroPhaseEnd() {
       if (phase === 'work') {
         saveSession(settings.pomodoroMinutes, true);
@@ -318,6 +428,11 @@
       const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
       sessionLog.push({ subName, durationMinutes, mode, completed });
       renderSessionLog();
+
+      // 計時完成後彈出日記 Modal
+      if (completed) {
+        openDiaryModal(subjectId, subName, durationMinutes);
+      }
     }
 
     function renderSessionLog() {
@@ -354,8 +469,15 @@
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (mode === 'free' && elapsed > 0) {
         if (confirm('確定要重置？目前計時將儲存為一筆記錄。')) {
-          saveSession(Math.floor(elapsed / 60), false);
+          const mins = Math.floor(elapsed / 60);
+          const subjectId = sel.value;
+          const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
+          saveSession(mins, false);
           resetTimer();
+          // 自由計時手動停止也彈出日記 Modal（有選科目且超過 1 分鐘）
+          if (subjectId && mins >= 1) {
+            openDiaryModal(subjectId, subName, mins);
+          }
         }
       } else {
         resetTimer();

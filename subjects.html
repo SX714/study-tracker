@@ -60,6 +60,16 @@
   </style>
 </head>
 <body>
+  <script>
+    (function() {
+      try {
+        var s = localStorage.getItem('st_settings');
+        var mode = s ? (JSON.parse(s).themeMode || 'system') : 'system';
+        if (mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches))
+          document.body.classList.add('dark');
+      } catch(e) {}
+    })();
+  </script>
 
   <nav class="navbar">
     <a href="index.html" class="nav-brand">
@@ -67,10 +77,11 @@
     </a>
     <ul class="nav-links">
       <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
-      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="subjects.html" class="active"><span class="nav-icon">📖</span> 科目管理</a></li>
       <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
       <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
       <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
+      <li><a href="diary.html"><span class="nav-icon">📓</span> 日記</a></li>
       <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
     </ul>
     <button class="nav-hamburger" aria-label="選單">
@@ -145,7 +156,11 @@
     </div>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="js/utils.js"></script>
+  <script src="js/firebase-sync.js"></script>
   <script src="js/ai-chat.js"></script>
   <script>
     const EMOJIS  = ['📖','✏️','➗','⚛️','🧪','🌿','📜','🗺️','⚖️','🔬','💻','🎵','🏃','🌏','🧮','📐'];

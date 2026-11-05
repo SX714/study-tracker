@@ -24,6 +24,40 @@
 }
 
 /* ===========================
+   深色模式 — body.dark 覆蓋
+   =========================== */
+body.dark {
+  --bg:           #0f1923;
+  --surface:      #1a2535;
+  --surface-2:    #243044;
+  --border:       #2d3f55;
+  --text:         #e2e8f0;
+  --text-muted:   #94a3b8;
+  --text-light:   #64748b;
+  --shadow:       0 2px 8px rgba(0, 0, 0, 0.30);
+  --shadow-md:    0 4px 16px rgba(0, 0, 0, 0.40);
+}
+
+/* badge 深色覆蓋（hard-coded 色彩） */
+body.dark .badge-blue   { background: #1e3a5f; color: #93c5fd; }
+body.dark .badge-green  { background: #14532d; color: #86efac; }
+body.dark .badge-yellow { background: #422006; color: #fde68a; }
+body.dark .badge-red    { background: #450a0a; color: #fca5a5; }
+body.dark .badge-purple { background: #2e1065; color: #c4b5fd; }
+body.dark .badge-gray   { background: #1e2a3a; color: #94a3b8; }
+
+/* settings.html test-result 深色覆蓋 */
+body.dark .test-result.success { background: #14532d; color: #86efac; }
+body.dark .test-result.error   { background: #450a0a; color: #fca5a5; }
+
+/* diary 深色覆蓋 */
+body.dark .diary-card          { background: #1a2535; border-color: #2d3f55; }
+body.dark .diary-date-group h3 { color: #94a3b8; border-color: #2d3f55; }
+body.dark .diary-mood-star.filled { color: #fbbf24; }
+body.dark .diary-mood-star     { color: #374357; }
+body.dark .diary-summary       { background: #0f1923; color: #94a3b8; }
+
+/* ===========================
    Reset & Base
    =========================== */
 *, *::before, *::after {
@@ -494,3 +528,245 @@ footer {
   /* AI 浮鈕位置 */
   .ai-fab { bottom: 20px; right: 20px; }
 }
+
+/* ===========================
+   學習日記
+   =========================== */
+
+/* 日記摘要（計時完成 Modal 內） */
+.diary-summary {
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.diary-summary strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+/* 心情星星評分 */
+.mood-stars {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.mood-star {
+  font-size: 1.6rem;
+  cursor: pointer;
+  color: var(--border);
+  transition: color var(--transition), transform var(--transition);
+  line-height: 1;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.mood-star:hover,
+.mood-star.active {
+  color: #f59e0b;
+  transform: scale(1.15);
+}
+
+/* 日記頁面：日期分組 */
+.diary-date-group {
+  margin-bottom: 28px;
+}
+
+.diary-date-group h3 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+/* 日記卡片 */
+.diary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diary-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.diary-card-subject {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.diary-card-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.diary-card-mood {
+  display: flex;
+  gap: 2px;
+}
+
+.diary-mood-star {
+  font-size: 1rem;
+  color: var(--border);
+}
+
+.diary-mood-star.filled {
+  color: #f59e0b;
+}
+
+.diary-card-content {
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.diary-card-content.empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.diary-card-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* 日記篩選列 */
+.diary-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.diary-count {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* ===========================
+   雲端同步區塊（settings.html）
+   =========================== */
+
+/* 登入狀態標籤 */
+.sync-status-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--border);
+  color: var(--text-muted);
+}
+.sync-status-badge.success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* Google 登入按鈕 */
+.sync-btn-google {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), box-shadow var(--transition);
+}
+.sync-btn-google:hover {
+  background: #f8f9fa;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+/* 使用者資訊卡 */
+.sync-user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.sync-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.sync-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sync-user-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.sync-user-email {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* 同步操作結果訊息 */
+.sync-msg {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-muted);
+}
+.sync-msg.success {
+  background: #dcfce7;
+  color: #15803d;
+}
+.sync-msg.error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* 深色模式覆蓋 */
+body.dark .sync-status-badge         { background: #243044; color: #94a3b8; }
+body.dark .sync-status-badge.success { background: #14532d; color: #86efac; }
+body.dark .sync-btn-google           { background: #1a2535; color: #e2e8f0; border-color: #2d3f55; }
+body.dark .sync-btn-google:hover     { background: #243044; }
+body.dark .sync-user-card            { background: #0f1923; border-color: #2d3f55; }
+body.dark .sync-msg                  { background: #243044; color: #94a3b8; }
+body.dark .sync-msg.success          { background: #14532d; color: #86efac; }
+body.dark .sync-msg.error            { background: #450a0a; color: #fca5a5; }

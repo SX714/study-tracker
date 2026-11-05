@@ -26,8 +26,16 @@ function loadData(key, fallback = []) {
  * @param {string} key
  * @param {*} value
  */
+/** 需要同步至 Firestore 的 localStorage key 集合 */
+const _SYNC_KEYS = new Set(['st_subjects', 'st_sessions', 'st_goals', 'st_diary']);
+
 function saveData(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+  // 非同步同步至 Firestore（若使用者已登入且 key 在同步範圍內）
+  if (window._firebaseUser && _SYNC_KEYS.has(key)) {
+    const uid = window._firebaseUser.uid;
+    window._firebaseSync?.syncKey(uid, key, value);
+  }
 }
 
 /* ===========================
@@ -135,6 +143,33 @@ function initNavActive() {
     if (href === current) link.classList.add('active');
   });
 }
+
+/* ===========================
+   主題（深色模式）
+   =========================== */
+
+/**
+ * 初始化頁面主題：讀取 st_settings.themeMode，套用或移除 body.dark。
+ * 'system'（預設）→ 跟隨 prefers-color-scheme
+ * 'dark'           → 強制深色
+ * 'light'          → 強制淺色
+ * 在 <body> 最頂端呼叫可避免 FOUC。
+ */
+function initTheme() {
+  const settings  = loadData('st_settings', {});
+  const mode      = settings.themeMode || 'system';
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark    = mode === 'dark' || (mode === 'system' && prefersDark);
+  document.body.classList.toggle('dark', isDark);
+}
+
+/**
+ * 監聽系統主題變更（當 themeMode === 'system' 時才有作用）
+ */
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  const settings = loadData('st_settings', {});
+  if ((settings.themeMode || 'system') === 'system') initTheme();
+});
 
 /**
  * 漢堡選單開關

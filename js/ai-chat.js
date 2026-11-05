@@ -476,6 +476,57 @@
         }
         #ai-fab { bottom:20px; right:20px; }
       }
+
+      /* ── 深色模式覆蓋 ── */
+      body.dark #ai-chat-window,
+      body.dark #ai-history-panel {
+        background:#1a2535; border-color:#2d3f55;
+        box-shadow:0 8px 32px rgba(0,0,0,0.50);
+      }
+      body.dark #ai-topic-picker {
+        background:#243044; border-bottom-color:#2d3f55;
+      }
+      body.dark #ai-topic-picker-title { color:#94a3b8; }
+      body.dark .ai-topic-choice {
+        background:#1a2535; border-color:#2d3f55; color:#e2e8f0;
+      }
+      body.dark .ai-topic-choice:hover { border-color:#4a9eff; background:#1e3a5f; }
+      body.dark .ai-topic-choice-label { color:#e2e8f0; }
+      body.dark #ai-view-tabs { background:#243044; border-bottom-color:#2d3f55; }
+      body.dark .ai-tab { color:#64748b; }
+      body.dark .ai-tab.active { color:#4a9eff; background:#1a2535; }
+      body.dark .ai-msg.model { background:#243044; color:#e2e8f0; }
+      body.dark .ai-msg.loading { background:#243044; color:#94a3b8; }
+      body.dark .ai-msg.error { background:#450a0a; color:#fca5a5; }
+      body.dark .ai-date-divider { color:#64748b; }
+      body.dark .ai-date-divider::before,
+      body.dark .ai-date-divider::after { background:#2d3f55; }
+      body.dark #ai-chat-welcome { color:#64748b; }
+      body.dark #ai-no-key { color:#94a3b8; }
+      body.dark #ai-chat-input-area { background:#243044; border-top-color:#2d3f55; }
+      body.dark #ai-stats-picker { background:#1e3a5f; border-bottom-color:#2d3f55; }
+      body.dark #ai-stats-picker-title { color:#94a3b8; }
+      body.dark .ai-stats-subject-btn { background:#243044; }
+      body.dark .ai-stats-subject-btn:hover { background:#2d3f55; }
+      body.dark .ai-stats-subject-btn.active { border-color:#4a9eff; background:#1e3a5f; }
+      body.dark #ai-chat-input { background:#1a2535; color:#e2e8f0; border-color:#2d3f55; }
+      body.dark #ai-chat-input:focus { border-color:#4a9eff; }
+      body.dark #ai-topic-label-bar { color:#64748b; }
+      body.dark #ai-stats-btn { background:#1e3a5f; border-color:#2d3f55; color:#93c5fd; }
+      body.dark #ai-stats-btn:hover { background:#243044; }
+      body.dark .ai-history-topic { border-color:#2d3f55; }
+      body.dark .ai-history-topic-header { background:#243044; }
+      body.dark .ai-history-topic-header:hover { background:#2d3f55; }
+      body.dark .ai-history-topic-title { color:#e2e8f0; }
+      body.dark .ai-history-topic-msgs { background:#1a2535; border-top-color:#2d3f55; }
+      body.dark .ai-history-topic-preview { color:#94a3b8; border-bottom-color:#2d3f55; }
+      body.dark .ai-history-topic-btn.load { background:#1e3a5f; color:#93c5fd; }
+      body.dark .ai-history-topic-btn.load:hover { background:#243044; }
+      body.dark .ai-history-topic-btn.del { background:#450a0a; color:#fca5a5; }
+      body.dark .ai-history-topic-btn.del:hover { background:#7f1d1d; }
+      body.dark .ai-history-empty { color:#64748b; }
+      body.dark .ai-history-topic-preview .role-badge.u { background:#1e3a5f; color:#93c5fd; }
+      body.dark .ai-history-topic-preview .role-badge.m { background:#14532d; color:#86efac; }
     `;
     document.head.appendChild(s);
   }

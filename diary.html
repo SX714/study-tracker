@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>學習日記 — Study Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <script>
+    (function() {
+      try {
+        var s = localStorage.getItem('st_settings');
+        var mode = s ? (JSON.parse(s).themeMode || 'system') : 'system';
+        if (mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches))
+          document.body.classList.add('dark');
+      } catch(e) {}
+    })();
+  </script>
+
+  <!-- 導覽列 -->
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">
+      <span class="brand-icon">📚</span> Study Tracker
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
+      <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
+      <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
+      <li><a href="diary.html" class="active"><span class="nav-icon">📓</span> 日記</a></li>
+      <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
+    </ul>
+    <button class="nav-hamburger" aria-label="選單">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <main>
+    <div class="page-header">
+      <div>
+        <h1>📓 學習日記</h1>
+        <p class="text-muted">記錄每次學習的心得與反思</p>
+      </div>
+      <a href="timer.html" class="btn btn-primary">⏱️ 去計時</a>
+    </div>
+
+    <!-- 篩選列 -->
+    <div class="diary-filter-bar">
+      <label class="form-label" style="margin:0; white-space:nowrap;">篩選科目：</label>
+      <select class="form-select" id="diary-subject-filter" style="width:auto; min-width:160px;">
+        <option value="">全部科目</option>
+      </select>
+      <span class="diary-count" id="diary-count"></span>
+    </div>
+
+    <!-- 日記清單 -->
+    <div id="diary-list">
+      <div class="empty-state">
+        <div class="empty-icon">📓</div>
+        <p>還沒有學習日記<br>完成一次計時後就會自動提示記錄！</p>
+      </div>
+    </div>
+  </main>
+
+  <footer>© 2025 Study Tracker — 純前端學習追蹤工具</footer>
+  <button class="ai-fab" id="ai-fab-btn" title="AI 學習助理">💬</button>
+
+  <!-- 編輯日記 Modal -->
+  <div class="modal-backdrop" id="edit-diary-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="edit-diary-title">✏️ 編輯日記</h2>
+        <button class="modal-close" id="edit-diary-close">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">學習心得</label>
+        <textarea class="form-textarea" id="edit-diary-content" rows="5" placeholder="輸入學習心得…"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">心情評分</label>
+        <div class="mood-stars" id="edit-mood-stars">
+          <button class="mood-star" data-val="1" title="很差">★</button>
+          <button class="mood-star" data-val="2" title="不太好">★</button>
+          <button class="mood-star" data-val="3" title="普通">★</button>
+          <button class="mood-star" data-val="4" title="不錯">★</button>
+          <button class="mood-star" data-val="5" title="很棒">★</button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+        <button class="btn btn-ghost" id="edit-diary-cancel">取消</button>
+        <button class="btn btn-primary" id="edit-diary-save">💾 儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/firebase-sync.js"></script>
+  <script src="js/ai-chat.js"></script>
+  <script src="js/diary.js"></script>
+</body>
+</html>
