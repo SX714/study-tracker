@@ -45,6 +45,7 @@ let _db   = null;
 /**
  * 初始化 Firebase App、Auth、Firestore。
  * 若 FIREBASE_CONFIG 仍為佔位值，靜默跳過（降級模式）。
+ * 防止重複 initializeApp（多頁面或快取情境）。
  */
 function initFirebase() {
   if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
@@ -52,7 +53,12 @@ function initFirebase() {
     return;
   }
   try {
-    _app  = firebase.initializeApp(FIREBASE_CONFIG);
+    // 防止重複初始化
+    if (firebase.apps.length > 0) {
+      _app = firebase.apps[0];
+    } else {
+      _app = firebase.initializeApp(FIREBASE_CONFIG);
+    }
     _auth = firebase.auth();
     _db   = firebase.firestore();
 
@@ -78,15 +84,42 @@ function initFirebase() {
    Auth 操作
    =========================== */
 
-/** Google OAuth 登入（彈出視窗） */
+/** Google OAuth 登入。
+ *  - 優先使用 signInWithPopup（需 HTTP/HTTPS）
+ *  - 若偵測到 file:// 協定，改用 signInWithRedirect
+ *  - popup 被封鎖時自動 fallback 至 redirect
+ */
 async function signInWithGoogle() {
   if (!_auth) { alert('Firebase 尚未初始化，請先設定 FIREBASE_CONFIG。'); return; }
+
+  // file:// 協定下 popup 無法運作，改用 redirect
+  if (location.protocol === 'file:') {
+    alert('⚠️ 請透過 HTTP 伺服器開啟此頁面才能使用 Google 登入。\n\n' +
+          '方法：使用 VS Code 的 Live Server 擴充功能，\n' +
+          '或在終端機執行：npx serve .');
+    return;
+  }
+
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
     await _auth.signInWithPopup(provider);
   } catch (err) {
-    console.error('[firebase-sync] Google 登入失敗：', err);
-    alert('登入失敗：' + err.message);
+    // popup 被封鎖時自動改用 redirect
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      console.warn('[firebase-sync] Popup 被封鎖，改用 redirect 登入…');
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await _auth.signInWithRedirect(provider);
+      } catch (redirectErr) {
+        console.error('[firebase-sync] Redirect 登入失敗：', redirectErr);
+        alert('登入失敗：' + redirectErr.message);
+      }
+    } else {
+      console.error('[firebase-sync] Google 登入失敗：', err);
+      alert('登入失敗：' + (err.message || err.code));
+    }
   }
 }
 
@@ -199,9 +232,14 @@ function _updateSyncUI(user) {
 }
 
 /* ===========================
-   掛載至 window，供 utils.js 使用
+   掛載至 window，供全域呼叫
    =========================== */
 window._firebaseSync = { syncKey, syncAllToFirestore, fetchAndMergeFromFirestore };
+
+// 將 Auth 操作函式也掛載到 window，讓 settings.html 的 inline script 可直接呼叫
+window.signInWithGoogle  = signInWithGoogle;
+window.signOutUser       = signOutUser;
+window.syncAllToFirestore = syncAllToFirestore;
 
 // 頁面載入後自動初始化
 document.addEventListener('DOMContentLoaded', initFirebase);
