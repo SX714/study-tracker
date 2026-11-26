@@ -111,17 +111,22 @@
       <span class="brand-icon">📚</span> Study Tracker
     </a>
     <ul class="nav-links">
-      <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
-      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="index.html"><span class="nav-icon">🏠</span> 主頁</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 學習項目</a></li>
       <li><a href="timer.html" class="active"><span class="nav-icon">⏱️</span> 計時器</a></li>
       <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
       <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
       <li><a href="diary.html"><span class="nav-icon">📓</span> 日記</a></li>
       <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
     </ul>
-    <button class="nav-hamburger" aria-label="選單">
-      <span></span><span></span><span></span>
-    </button>
+    <div class="nav-right">
+      <div id="nav-user-avatar-wrap" style="display:none; cursor:pointer;" title="已登入" onclick="location.href='settings.html'">
+        <img id="nav-user-avatar" src="" alt="頭像" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.5);">
+      </div>
+      <button class="nav-hamburger" aria-label="選單">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </nav>
 
   <main>
@@ -139,11 +144,11 @@
         <button class="mode-tab" data-mode="free">⏱ 自由計時</button>
       </div>
 
-      <!-- 科目選擇 -->
+      <!-- 學習項目選擇 -->
       <div class="form-group mb-24">
-        <label class="form-label">選擇學習科目 *</label>
+        <label class="form-label">選擇學習項目 *</label>
         <select class="form-select" id="subject-select">
-          <option value="">— 請選擇科目 —</option>
+          <option value="">— 請選擇學習項目 —</option>
         </select>
       </div>
 
@@ -162,6 +167,7 @@
 
         <div class="timer-controls">
           <button class="btn btn-primary btn-lg" id="start-btn">▶ 開始</button>
+          <button class="btn btn-ghost btn-lg" id="stop-free-btn" style="display:none;">⏹ 停止並儲存</button>
           <button class="btn btn-ghost btn-lg" id="reset-btn">↺ 重置</button>
         </div>
       </div>
@@ -227,9 +233,9 @@
     });
 
     const PHASES = {
-      work:       { label: '🍅 專注時間', minutes: settings.pomodoroMinutes },
-      shortBreak: { label: '☕ 短休息',   minutes: settings.shortBreakMinutes },
-      longBreak:  { label: '🛌 長休息',   minutes: settings.longBreakMinutes }
+      work:       { label: '🍅 專注時間', minutes: settings.pomodoroMinutes || 25 },
+      shortBreak: { label: '☕ 短休息',   minutes: settings.shortBreakMinutes || 5 },
+      longBreak:  { label: '🛌 長休息',   minutes: settings.longBreakMinutes || 15 }
     };
 
     let mode        = 'pomodoro'; // 'pomodoro' | 'free'
@@ -242,7 +248,7 @@
     let sessionStart  = null;
     const sessionLog  = [];
 
-    // 載入科目
+    // 載入學習項目
     const subjects = loadData('st_subjects', []);
     const sel = document.getElementById('subject-select');
     subjects.forEach(s => {
@@ -257,6 +263,17 @@
     if (params.get('subject')) sel.value = params.get('subject');
     if (params.get('mode') === 'free') switchMode('free');
 
+    // 切換學習項目時，若番茄在進行中詢問是否重置
+    sel.addEventListener('change', () => {
+      if (mode === 'pomodoro' && running) {
+        const restart = confirm('切換學習項目，是否重新開始目前的番茄鐘？\n\n【確定】重新開始　【取消】繼續計時（只換項目）');
+        if (restart) {
+          resetTimer();
+        }
+        // 無論如何都允許換項目，resetTimer 會 pause 而不是阻止切換
+      }
+    });
+
     // 模式切換 Tab
     document.querySelectorAll('.mode-tab').forEach(tab => {
       tab.addEventListener('click', () => switchMode(tab.dataset.mode));
@@ -269,17 +286,26 @@
       resetTimer();
       document.getElementById('pomodoro-dots').style.display =
         m === 'pomodoro' ? 'flex' : 'none';
+      document.getElementById('stop-free-btn').style.display =
+        m === 'free' ? 'inline-flex' : 'none';
       if (m === 'free') {
         document.getElementById('phase-label').textContent = '⏱ 自由計時';
-        document.getElementById('timer-display').textContent = '00:00';
+        document.getElementById('timer-display').textContent = '00:00:00';
       }
     }
 
     function updateDisplay() {
       const secs = mode === 'free' ? elapsed : remaining;
-      const mm = String(Math.floor(secs / 60)).padStart(2, '0');
-      const ss = String(secs % 60).padStart(2, '0');
-      document.getElementById('timer-display').textContent = `${mm}:${ss}`;
+      if (mode === 'free') {
+        const hh = String(Math.floor(secs / 3600)).padStart(2, '0');
+        const mm = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+        const ss = String(secs % 60).padStart(2, '0');
+        document.getElementById('timer-display').textContent = `${hh}:${mm}:${ss}`;
+      } else {
+        const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+        const ss = String(secs % 60).padStart(2, '0');
+        document.getElementById('timer-display').textContent = `${mm}:${ss}`;
+      }
     }
 
     function updateDots() {
@@ -291,7 +317,7 @@
     }
 
     function startTimer() {
-      if (!sel.value) { alert('請先選擇學習科目！'); return; }
+      if (!sel.value) { alert('請先選擇學習項目！'); return; }
       running = true;
       sessionStart = sessionStart || new Date();
       document.getElementById('start-btn').textContent = '⏸ 暫停';
@@ -332,16 +358,16 @@
 
     // ── 日記 Modal ──────────────────────────────────────
     let diaryMood = 3;
-    let pendingDiarySession = null; // { subjectId, subName, durationMinutes }
+    let pendingDiarySession = null; // { subjectId, subName, durationSeconds }
 
-    function openDiaryModal(subjectId, subName, durationMinutes) {
-      pendingDiarySession = { subjectId, subName, durationMinutes };
+    function openDiaryModal(subjectId, subName, durationSeconds) {
+      pendingDiarySession = { subjectId, subName, durationSeconds };
       diaryMood = 3;
 
-      // 摘要區
+      // 摘要區（顯示到秒）
       document.getElementById('diary-summary').innerHTML =
         `<div><strong>${subName}</strong></div>` +
-        `<div>⏱ ${formatMinutes(durationMinutes)}</div>`;
+        `<div>⏱ ${formatDuration(durationSeconds)}</div>`;
 
       // 清空心得
       document.getElementById('diary-content').value = '';
@@ -374,7 +400,7 @@
 
     document.getElementById('diary-save-btn').addEventListener('click', () => {
       if (!pendingDiarySession) return;
-      const { subjectId, durationMinutes } = pendingDiarySession;
+      const { subjectId } = pendingDiarySession;
       const content = document.getElementById('diary-content').value.trim();
       const entry = {
         id: generateId(),
@@ -391,11 +417,37 @@
     });
     // ── 日記 Modal 結束 ─────────────────────────────────
 
+    // 儲存 session（以秒為單位，同時保留 durationMinutes 供舊邏輯相容）
+    function saveSession(durationSeconds, completed) {
+      const subjectId = sel.value;
+      if (!subjectId || durationSeconds < 1) return;
+      const durationMinutes = durationSeconds / 60; // 保留小數，精確到秒
+      const session = {
+        id: generateId(), subjectId, mode,
+        startAt: (sessionStart || new Date()).toISOString(),
+        durationSeconds,          // 新欄位：精確秒數
+        durationMinutes,          // 相容舊邏輯（浮點分鐘）
+        completed
+      };
+      const sessions = loadData('st_sessions', []);
+      sessions.push(session);
+      saveData('st_sessions', sessions);
+
+      const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
+      sessionLog.push({ subName, durationSeconds, mode, completed });
+      renderSessionLog();
+
+      // 計時完成後彈出日記 Modal
+      if (completed) {
+        openDiaryModal(subjectId, subName, durationSeconds);
+      }
+    }
+
     function onPomodoroPhaseEnd() {
       if (phase === 'work') {
-        saveSession(settings.pomodoroMinutes, true);
+        saveSession(PHASES.work.minutes * 60, true);
         pomodoroRound++;
-        if (pomodoroRound >= settings.longBreakInterval) {
+        if (pomodoroRound >= (settings.longBreakInterval || 4)) {
           pomodoroRound = 0;
           phase = 'longBreak';
         } else {
@@ -413,28 +465,6 @@
       startTimer();
     }
 
-    function saveSession(durationMinutes, completed) {
-      const subjectId = sel.value;
-      if (!subjectId || durationMinutes < 1) return;
-      const session = {
-        id: generateId(), subjectId, mode,
-        startAt: (sessionStart || new Date()).toISOString(),
-        durationMinutes, completed
-      };
-      const sessions = loadData('st_sessions', []);
-      sessions.push(session);
-      saveData('st_sessions', sessions);
-
-      const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
-      sessionLog.push({ subName, durationMinutes, mode, completed });
-      renderSessionLog();
-
-      // 計時完成後彈出日記 Modal
-      if (completed) {
-        openDiaryModal(subjectId, subName, durationMinutes);
-      }
-    }
-
     function renderSessionLog() {
       const el = document.getElementById('session-log-list');
       if (sessionLog.length === 0) {
@@ -445,7 +475,7 @@
         <div class="session-log-item">
           <span>${s.mode === 'pomodoro' ? '🍅' : '⏱'} ${s.subName}</span>
           <span class="badge badge-${s.completed ? 'green' : 'gray'}">
-            ${formatMinutes(s.durationMinutes)}
+            ${formatDuration(s.durationSeconds)}
           </span>
         </div>`).join('');
     }
@@ -466,18 +496,26 @@
       running ? pauseTimer() : startTimer();
     });
 
+    // 自由計時「停止並儲存」按鈕
+    document.getElementById('stop-free-btn').addEventListener('click', () => {
+      if (elapsed < 1) { alert('尚未開始計時'); return; }
+      const subjectId = sel.value;
+      if (!subjectId) { alert('請先選擇學習項目！'); return; }
+      const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
+      const secs = elapsed;
+      saveSession(secs, true);
+      resetTimer();
+      openDiaryModal(subjectId, subName, secs);
+    });
+
     document.getElementById('reset-btn').addEventListener('click', () => {
       if (mode === 'free' && elapsed > 0) {
         if (confirm('確定要重置？目前計時將儲存為一筆記錄。')) {
-          const mins = Math.floor(elapsed / 60);
+          const secs = elapsed;
           const subjectId = sel.value;
           const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
-          saveSession(mins, false);
+          saveSession(secs, false);
           resetTimer();
-          // 自由計時手動停止也彈出日記 Modal（有選科目且超過 1 分鐘）
-          if (subjectId && mins >= 1) {
-            openDiaryModal(subjectId, subName, mins);
-          }
         }
       } else {
         resetTimer();

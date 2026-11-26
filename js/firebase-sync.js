@@ -67,12 +67,14 @@ function initFirebase() {
       if (user) {
         window._firebaseUser = user;
         _updateSyncUI(user);
+        _updateNavAvatar(user);
         // 登入後先拉取雲端資料，再上傳本機資料
         await fetchAndMergeFromFirestore(user.uid);
         await syncAllToFirestore(user.uid);
       } else {
         window._firebaseUser = null;
         _updateSyncUI(null);
+        _updateNavAvatar(null);
       }
     });
   } catch (err) {
@@ -85,37 +87,49 @@ function initFirebase() {
    =========================== */
 
 /** Google OAuth 登入。
- *  - 優先使用 signInWithPopup（需 HTTP/HTTPS）
- *  - 若偵測到 file:// 協定，改用 signInWithRedirect
- *  - popup 被封鎖時自動 fallback 至 redirect
+ *  - 優先使用 signInWithPopup（HTTPS 環境）
+ *  - popup 被封鎖時自動 fallback 至 signInWithRedirect
+ *  - file:// 協定下給出友善提示（Firebase Auth 本身不支援 file://）
  */
 async function signInWithGoogle() {
   if (!_auth) { alert('Firebase 尚未初始化，請先設定 FIREBASE_CONFIG。'); return; }
 
-  // file:// 協定下 popup 無法運作，改用 redirect
+  // file:// 協定：Firebase Auth 完全不支援，給出友善說明
   if (location.protocol === 'file:') {
-    alert('⚠️ 請透過 HTTP 伺服器開啟此頁面才能使用 Google 登入。\n\n' +
-          '方法：使用 VS Code 的 Live Server 擴充功能，\n' +
-          '或在終端機執行：npx serve .');
+    alert(
+      '⚠️ Google 登入需要透過網頁伺服器（https:// 或 http://localhost）開啟。\n\n' +
+      '最簡單的方法是將專案部署到 GitHub Pages：\n' +
+      '1. 在 GitHub 建立 repository，將所有檔案上傳\n' +
+      '2. 前往 Settings → Pages → 選 main branch → Save\n' +
+      '3. 取得網址後，在 Firebase Console → Authentication\n' +
+      '   → Settings → 授權網域，新增你的 GitHub Pages 網址\n\n' +
+      '本機測試可用 VS Code 的 Live Server 擴充功能。'
+    );
     return;
   }
 
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.addScope('email');
+  provider.addScope('profile');
+
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.addScope('email');
-    provider.addScope('profile');
     await _auth.signInWithPopup(provider);
   } catch (err) {
-    // popup 被封鎖時自動改用 redirect
     if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      // popup 被封鎖時改用 redirect
       console.warn('[firebase-sync] Popup 被封鎖，改用 redirect 登入…');
       try {
-        const provider = new firebase.auth.GoogleAuthProvider();
         await _auth.signInWithRedirect(provider);
       } catch (redirectErr) {
         console.error('[firebase-sync] Redirect 登入失敗：', redirectErr);
         alert('登入失敗：' + redirectErr.message);
       }
+    } else if (err.code === 'auth/unauthorized-domain') {
+      alert(
+        '❌ 此網域尚未在 Firebase 授權。\n\n' +
+        '請前往 Firebase Console → Authentication → Settings → 授權網域，\n' +
+        '將目前的網址（' + location.hostname + '）加入清單後再試一次。'
+      );
     } else {
       console.error('[firebase-sync] Google 登入失敗：', err);
       alert('登入失敗：' + (err.message || err.code));
@@ -201,6 +215,22 @@ async function fetchAndMergeFromFirestore(uid) {
 /* ===========================
    UI 更新（供 settings.html 使用）
    =========================== */
+
+/**
+ * 更新導覽列右上角頭像（所有頁面皆適用）
+ * 若元素不存在（非對應頁面），靜默跳過。
+ */
+function _updateNavAvatar(user) {
+  const wrap = document.getElementById('nav-user-avatar-wrap');
+  const img  = document.getElementById('nav-user-avatar');
+  if (!wrap || !img) return;
+  if (user && user.photoURL) {
+    img.src = user.photoURL;
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
 
 /** 更新設定頁的登入狀態 UI（若元素存在） */
 function _updateSyncUI(user) {

@@ -32,7 +32,7 @@
      =========================== */
   function getCurrentPage() {
     const f = location.pathname.split('/').pop() || 'index.html';
-    return { 'index.html':'儀表板','subjects.html':'科目管理','timer.html':'計時器',
+    return { 'index.html':'主頁','subjects.html':'學習項目','timer.html':'計時器',
              'stats.html':'統計圖表','goals.html':'目標計畫','settings.html':'設定' }[f] || f;
   }
   function getCurrentSubject() {
@@ -709,12 +709,12 @@
     try {
       const subjects = JSON.parse(localStorage.getItem('st_subjects') || '[]');
       if (subjects.length === 0) {
-        picker.innerHTML = `<div id="ai-stats-picker-title">尚無科目，請先至科目管理新增。</div>`;
+        picker.innerHTML = `<div id="ai-stats-picker-title">尚無學習項目，請先至學習項目管理新增。</div>`;
         picker.style.display = 'block';
         return;
       }
       picker.innerHTML = `
-        <div id="ai-stats-picker-title">📊 選擇科目以插入統計數據</div>
+        <div id="ai-stats-picker-title">📊 選擇學習項目以插入統計數據</div>
         <div id="ai-stats-picker-btns">
           ${subjects.map(s => `
             <button class="ai-stats-subject-btn"

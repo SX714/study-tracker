@@ -109,7 +109,7 @@
 
   function buildCard(entry) {
     const sub     = subjectMap[entry.subjectId];
-    const subName = sub ? `${sub.emoji || ''} ${sub.name}` : '未知科目';
+    const subName = sub ? `${sub.emoji || ''} ${sub.name}` : '未知項目';
     const content = entry.content
       ? `<div class="diary-card-content">${escapeHtml(entry.content)}</div>`
       : `<div class="diary-card-content empty">（無心得記錄）</div>`;

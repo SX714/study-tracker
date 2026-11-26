@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>儀表板 — Study Tracker</title>
+  <title>主頁 — Study Tracker</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -24,17 +24,22 @@
       <span class="brand-icon">📚</span> Study Tracker
     </a>
     <ul class="nav-links">
-      <li><a href="index.html" class="active"><span class="nav-icon">🏠</span> 儀表板</a></li>
-      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="index.html" class="active"><span class="nav-icon">🏠</span> 主頁</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 學習項目</a></li>
       <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
       <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
       <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
       <li><a href="diary.html"><span class="nav-icon">📓</span> 日記</a></li>
       <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
     </ul>
-    <button class="nav-hamburger" aria-label="選單">
-      <span></span><span></span><span></span>
-    </button>
+    <div class="nav-right">
+      <div id="nav-user-avatar-wrap" style="display:none; cursor:pointer;" title="已登入" onclick="location.href='settings.html'">
+        <img id="nav-user-avatar" src="" alt="頭像" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.5);">
+      </div>
+      <button class="nav-hamburger" aria-label="選單">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </nav>
 
   <!-- 主內容 -->
@@ -53,13 +58,13 @@
     <!-- 摘要卡片 -->
     <div class="summary-grid">
       <div class="card">
-        <div class="card-title">今日學習時數</div>
-        <div class="card-value" id="today-minutes">0m</div>
+        <div class="card-title">今日學習時間</div>
+        <div class="card-value" id="today-minutes">0s</div>
         <div class="card-sub">本日累計</div>
       </div>
       <div class="card">
-        <div class="card-title">本週學習時數</div>
-        <div class="card-value" id="week-minutes">0m</div>
+        <div class="card-title">本週學習時間</div>
+        <div class="card-value" id="week-minutes">0s</div>
         <div class="card-sub">本週累計</div>
       </div>
       <div class="card">
@@ -79,7 +84,7 @@
       <div class="card-title">⚡ 快速啟動</div>
       <div class="flex gap-12 mt-8" style="flex-wrap:wrap; align-items:center;">
         <select class="form-select" id="quick-subject" style="max-width:200px;">
-          <option value="">選擇科目…</option>
+          <option value="">選擇學習項目…</option>
         </select>
         <a href="timer.html" class="btn btn-primary" id="quick-start-btn">
           ▶ 開始番茄鐘
@@ -142,15 +147,20 @@
       const { start: wStart, end: wEnd } = getThisWeekRange();
       const sessions = loadData('st_sessions', []);
 
-      // 今日時數
-      const todaySessions = sessions.filter(s => s.startAt.startsWith(today));
-      document.getElementById('today-minutes').textContent =
-        formatMinutes(todaySessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0));
+      // 輔助：取 session 的秒數（相容新舊資料）
+      function getSeconds(s) {
+        return s.durationSeconds != null ? s.durationSeconds : (s.durationMinutes || 0) * 60;
+      }
 
-      // 本週時數
+      // 今日時數（顯示到秒）
+      const todaySessions = sessions.filter(s => s.startAt.startsWith(today));
+      const todaySecs = todaySessions.reduce((sum, s) => sum + getSeconds(s), 0);
+      document.getElementById('today-minutes').textContent = formatDuration(todaySecs);
+
+      // 本週時數（顯示到秒）
       const weekSessions = sessions.filter(s => isInRange(s.startAt.slice(0,10), wStart, wEnd));
-      document.getElementById('week-minutes').textContent =
-        formatMinutes(weekSessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0));
+      const weekSecs = weekSessions.reduce((sum, s) => sum + getSeconds(s), 0);
+      document.getElementById('week-minutes').textContent = formatDuration(weekSecs);
 
       // 今日番茄數
       document.getElementById('pomodoro-count').textContent =
@@ -166,7 +176,7 @@
         sel.appendChild(opt);
       });
 
-      // 快速啟動連結帶科目參數
+      // 快速啟動連結帶學習項目參數
       sel.addEventListener('change', () => {
         const id = sel.value;
         document.getElementById('quick-start-btn').href =
@@ -182,18 +192,19 @@
         const subMap = Object.fromEntries(subjects.map(s => [s.id, s]));
         recentEl.innerHTML = recent.map(s => {
           const sub = subMap[s.subjectId];
+          const secs = getSeconds(s);
           return `
             <div style="display:flex; justify-content:space-between; align-items:center;
                         padding:8px 0; border-bottom:1px solid var(--border);">
               <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:1.1rem">${sub?.emoji || '📝'}</span>
-                <span style="font-size:0.88rem">${sub?.name || '未知科目'}</span>
+                <span style="font-size:0.88rem">${sub?.name || '未知項目'}</span>
                 <span class="badge badge-${s.mode === 'pomodoro' ? 'blue' : 'gray'}">
                   ${s.mode === 'pomodoro' ? '🍅 番茄' : '⏱ 自由'}
                 </span>
               </div>
               <span style="font-size:0.82rem; color:var(--text-muted);">
-                ${formatMinutes(s.durationMinutes || 0)} · ${formatDate(s.startAt)}
+                ${formatDuration(secs)} · ${formatDate(s.startAt)}
               </span>
             </div>`;
         }).join('');
@@ -208,12 +219,13 @@
         goalsEl.innerHTML = activeGoals.slice(0, 3).map(g => {
           const subName = g.subjectId
             ? (subjects.find(s => s.id === g.subjectId)?.name || '未知')
-            : '所有科目';
-          const done = sessions
+            : '所有項目';
+          const doneSecs = sessions
             .filter(s => isInRange(s.startAt.slice(0,10), g.startDate, g.endDate)
               && (!g.subjectId || s.subjectId === g.subjectId))
-            .reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
-          const pct = Math.min(100, Math.round((done / g.targetMinutes) * 100));
+            .reduce((sum, s) => sum + (s.durationSeconds != null ? s.durationSeconds : (s.durationMinutes || 0) * 60), 0);
+          const doneMin = doneSecs / 60;
+          const pct = Math.min(100, Math.round((doneMin / g.targetMinutes) * 100));
           return `
             <div style="margin-bottom:14px;">
               <div style="display:flex; justify-content:space-between; font-size:0.88rem; margin-bottom:4px;">
@@ -226,7 +238,7 @@
                      style="width:${pct}%"></div>
               </div>
               <div style="font-size:0.78rem; color:var(--text-muted); margin-top:3px;">
-                ${formatMinutes(done)} / ${formatMinutes(g.targetMinutes)}
+                ${formatDuration(doneSecs)} / ${formatMinutes(g.targetMinutes)}
               </div>
             </div>`;
         }).join('');
@@ -235,11 +247,12 @@
       // 目標達成率
       if (activeGoals.length > 0) {
         const rates = activeGoals.map(g => {
-          const done = sessions
+          const doneSecs = sessions
             .filter(s => isInRange(s.startAt.slice(0,10), g.startDate, g.endDate)
               && (!g.subjectId || s.subjectId === g.subjectId))
-            .reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
-          return Math.min(100, Math.round((done / g.targetMinutes) * 100));
+            .reduce((sum, s) => sum + (s.durationSeconds != null ? s.durationSeconds : (s.durationMinutes || 0) * 60), 0);
+          const doneMin = doneSecs / 60;
+          return Math.min(100, Math.round((doneMin / g.targetMinutes) * 100));
         });
         const avg = Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
         document.getElementById('goal-rate').textContent = `${avg}%`;

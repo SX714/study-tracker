@@ -129,6 +129,25 @@ function formatMinutes(minutes) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+/**
+ * 將秒數轉為 Xh Ym Zs 字串（例：3661 → "1h 1m 1s"）
+ * 若秒數 < 60 只顯示秒；若無秒餘數省略秒。
+ * @param {number} totalSeconds
+ * @returns {string}
+ */
+function formatDuration(totalSeconds) {
+  totalSeconds = Math.round(totalSeconds || 0);
+  if (totalSeconds <= 0) return '0s';
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  let result = '';
+  if (h > 0) result += `${h}h `;
+  if (m > 0) result += `${m}m `;
+  if (s > 0 || result === '') result += `${s}s`;
+  return result.trim();
+}
+
 /* ===========================
    導覽列初始化（高亮當前頁面）
    =========================== */
@@ -189,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * 首次訪問時預置 3 筆預設科目（只在 st_subjects 尚未存在時執行）
+ * 首次訪問時預置 3 筆預設學習項目（只在 st_subjects 尚未存在時執行）
  */
 function initDefaultSubjects() {
   if (localStorage.getItem('st_subjects') !== null) return; // 已有資料，跳過

@@ -59,6 +59,26 @@
     }
     .stats-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
     .stats-table tr:last-child td { border-bottom: none; }
+    /* 學習記錄列表 */
+    .session-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+      gap: 8px;
+    }
+    .session-item-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+    .session-item-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .session-delete-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); font-size: 1rem; padding: 2px 6px;
+      border-radius: 4px; transition: color var(--transition), background var(--transition);
+    }
+    .session-delete-btn:hover { color: var(--danger); background: #fee2e2; }
   </style>
 </head>
 <body>
@@ -78,24 +98,29 @@
       <span class="brand-icon">📚</span> Study Tracker
     </a>
     <ul class="nav-links">
-      <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
-      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="index.html"><span class="nav-icon">🏠</span> 主頁</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 學習項目</a></li>
       <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
       <li><a href="stats.html" class="active"><span class="nav-icon">📊</span> 統計圖表</a></li>
       <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
       <li><a href="diary.html"><span class="nav-icon">📓</span> 日記</a></li>
       <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
     </ul>
-    <button class="nav-hamburger" aria-label="選單">
-      <span></span><span></span><span></span>
-    </button>
+    <div class="nav-right">
+      <div id="nav-user-avatar-wrap" style="display:none; cursor:pointer;" title="已登入" onclick="location.href='settings.html'">
+        <img id="nav-user-avatar" src="" alt="頭像" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.5);">
+      </div>
+      <button class="nav-hamburger" aria-label="選單">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </nav>
 
   <main>
     <div class="page-header">
       <div>
         <h1>📊 統計圖表</h1>
-        <p class="text-muted">分析你的學習時數與科目分佈</p>
+        <p class="text-muted">分析你的學習時間與項目分佈</p>
       </div>
     </div>
 
@@ -125,7 +150,7 @@
     <div id="charts-area">
       <div class="charts-grid">
         <div class="chart-card full-width">
-          <div class="chart-title">📅 每日學習時數（分鐘）</div>
+          <div class="chart-title">📅 每日學習時間（分項目）</div>
           <canvas id="chart-daily" height="100"></canvas>
         </div>
         <div class="chart-card">
@@ -133,20 +158,20 @@
           <canvas id="chart-weekly" height="200"></canvas>
         </div>
         <div class="chart-card">
-          <div class="chart-title">🥧 科目時數分佈</div>
+          <div class="chart-title">🥧 學習項目時間分佈</div>
           <canvas id="chart-doughnut" height="200"></canvas>
         </div>
       </div>
 
       <!-- 統計表格 -->
-      <div class="card">
-        <div class="card-title mb-16">📋 各科目統計</div>
+      <div class="card mb-24">
+        <div class="card-title mb-16">📋 各學習項目統計</div>
         <div id="stats-table-wrap">
           <table class="stats-table">
             <thead>
               <tr>
-                <th>科目</th>
-                <th>總時數</th>
+                <th>學習項目</th>
+                <th>總時間</th>
                 <th>學習次數</th>
                 <th>平均每次</th>
                 <th>完成番茄</th>
@@ -155,6 +180,15 @@
             <tbody id="stats-tbody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- 學習記錄明細（可刪除） -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:0">📝 學習記錄明細</div>
+          <span id="sessions-count" style="font-size:0.82rem; color:var(--text-muted);"></span>
+        </div>
+        <div id="sessions-list"></div>
       </div>
     </div>
   </main>
@@ -179,6 +213,11 @@
 
     const subjects = loadData('st_subjects', []);
     const subMap   = Object.fromEntries(subjects.map(s => [s.id, s]));
+
+    // 相容新舊資料：取得秒數
+    function getSeconds(s) {
+      return s.durationSeconds != null ? s.durationSeconds : (s.durationMinutes || 0) * 60;
+    }
 
     function setRange(range) {
       currentRange = range;
@@ -218,42 +257,58 @@
       document.getElementById('charts-area').style.display  = noData ? 'none'  : 'block';
       if (noData) return;
 
+      // ── 每日學習時間（堆疊長條圖，區分項目）──────────────
+      // 取得有資料的所有 subjectId（依出現順序）
+      const subIds = [...new Set(sessions.map(s => s.subjectId))];
 
-      // 每日時數
-      const dailyData = dates.map(d =>
-        sessions.filter(s => s.startAt.startsWith(d))
-                .reduce((sum, s) => sum + (s.durationMinutes || 0), 0));
+      const dailyDatasets = subIds.map(id => {
+        const sub = subMap[id];
+        return {
+          label: `${sub?.emoji || ''} ${sub?.name || '未知'}`.trim(),
+          data: dates.map(d =>
+            sessions.filter(s => s.subjectId === id && s.startAt.startsWith(d))
+                    .reduce((sum, s) => sum + getSeconds(s) / 60, 0) // 分鐘（可含小數）
+          ),
+          backgroundColor: (sub?.color || '#aaa') + 'cc', // 加透明度
+          borderColor:     sub?.color || '#aaa',
+          borderWidth: 1,
+          borderRadius: 4,
+        };
+      });
 
       if (chartDaily) chartDaily.destroy();
       chartDaily = new Chart(document.getElementById('chart-daily'), {
         type: 'bar',
-        data: {
-          labels: dates.map(d => d.slice(5)),
-          datasets: [{ label: '學習時數（分鐘）', data: dailyData,
-            backgroundColor: 'rgba(74,158,255,0.7)', borderRadius: 6 }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, ticks: { stepSize: 30 } } } }
+        data: { labels: dates.map(d => d.slice(5)), datasets: dailyDatasets },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } } },
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true, ticks: { stepSize: 30 },
+                 title: { display: true, text: '分鐘' } }
+          }
+        }
       });
 
-      // 每週趨勢（依週計算）
+      // ── 每週趨勢 ─────────────────────────────────────────
       const weeklyMap = {};
       sessions.forEach(s => {
         const d    = new Date(s.startAt);
-        const day  = d.getDay() === 0 ? 6 : d.getDay() - 1; // 週一為起點
+        const day  = d.getDay() === 0 ? 6 : d.getDay() - 1;
         const mono = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
         const wStart = toDateStr(mono);
-        weeklyMap[wStart] = (weeklyMap[wStart] || 0) + (s.durationMinutes || 0);
+        weeklyMap[wStart] = (weeklyMap[wStart] || 0) + getSeconds(s);
       });
       const weekLabels = Object.keys(weeklyMap).sort();
-      const weekData   = weekLabels.map(k => +(weeklyMap[k] / 60).toFixed(1));
+      const weekData   = weekLabels.map(k => +(weeklyMap[k] / 3600).toFixed(2));
 
       if (chartWeekly) chartWeekly.destroy();
       chartWeekly = new Chart(document.getElementById('chart-weekly'), {
         type: 'line',
         data: {
           labels: weekLabels.map(d => d.slice(5)),
-          datasets: [{ label: '學習時數（小時）', data: weekData,
+          datasets: [{ label: '學習時間（小時）', data: weekData,
             borderColor: '#4a9eff', backgroundColor: 'rgba(74,158,255,0.1)',
             tension: 0.3, fill: true, pointRadius: 4 }]
         },
@@ -261,13 +316,14 @@
           scales: { y: { beginAtZero: true } } }
       });
 
-      // 科目分佈
+      // ── 項目分佈圓餅圖 ───────────────────────────────────
       const subTotals = {};
       sessions.forEach(s => {
-        subTotals[s.subjectId] = (subTotals[s.subjectId] || 0) + (s.durationMinutes || 0);
+        subTotals[s.subjectId] = (subTotals[s.subjectId] || 0) + getSeconds(s);
       });
-      const dLabels = Object.keys(subTotals).map(id => subMap[id]?.name || '未知');
-      const dData   = Object.values(subTotals);
+      const dLabels = Object.keys(subTotals).map(id =>
+        `${subMap[id]?.emoji || ''} ${subMap[id]?.name || '未知'}`.trim());
+      const dData   = Object.values(subTotals).map(s => +(s / 60).toFixed(1)); // 分鐘
       const dColors = Object.keys(subTotals).map(id => subMap[id]?.color || '#aaa');
 
       if (chartDoughnut) chartDoughnut.destroy();
@@ -279,29 +335,73 @@
           plugins: { legend: { position: 'bottom', labels: { padding: 14, font: { size: 12 } } } } }
       });
 
-      // 統計表格
+      // ── 統計表格 ─────────────────────────────────────────
       const tbody = document.getElementById('stats-tbody');
       if (Object.keys(subTotals).length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="padding:24px;">
           此區間尚無學習記錄</td></tr>`;
+      } else {
+        tbody.innerHTML = Object.entries(subTotals)
+          .sort((a,b) => b[1] - a[1])
+          .map(([id, totalSecs]) => {
+            const sub = subMap[id] || {};
+            const subSessions = sessions.filter(s => s.subjectId === id);
+            const avgSecs = Math.round(totalSecs / subSessions.length);
+            const pomodoros = subSessions.filter(s => s.mode === 'pomodoro' && s.completed).length;
+            return `<tr>
+              <td><span style="color:${sub.color||'#aaa'};margin-right:6px;">●</span>
+                  ${sub.emoji || ''} ${sub.name || '未知'}</td>
+              <td><strong>${formatDuration(totalSecs)}</strong></td>
+              <td>${subSessions.length} 次</td>
+              <td>${formatDuration(avgSecs)}</td>
+              <td>${pomodoros} 🍅</td>
+            </tr>`;
+          }).join('');
+      }
+
+      // ── 學習記錄明細（可刪除） ───────────────────────────
+      renderSessionsList(sessions);
+    }
+
+    function renderSessionsList(sessions) {
+      const listEl = document.getElementById('sessions-list');
+      const countEl = document.getElementById('sessions-count');
+      countEl.textContent = `共 ${sessions.length} 筆`;
+
+      if (sessions.length === 0) {
+        listEl.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); padding:12px 0;">此區間無記錄</p>`;
         return;
       }
-      tbody.innerHTML = Object.entries(subTotals)
-        .sort((a,b) => b[1] - a[1])
-        .map(([id, total]) => {
-          const sub = subMap[id] || {};
-          const subSessions = sessions.filter(s => s.subjectId === id);
-          const avg = Math.round(total / subSessions.length);
-          const pomodoros = subSessions.filter(s => s.mode === 'pomodoro' && s.completed).length;
-          return `<tr>
-            <td><span style="color:${sub.color||'#aaa'};margin-right:6px;">●</span>
-                ${sub.emoji || ''} ${sub.name || '未知'}</td>
-            <td><strong>${formatMinutes(total)}</strong></td>
-            <td>${subSessions.length} 次</td>
-            <td>${formatMinutes(avg)}</td>
-            <td>${pomodoros} 🍅</td>
-          </tr>`;
-        }).join('');
+
+      // 由新到舊排列
+      const sorted = [...sessions].sort((a, b) => b.startAt.localeCompare(a.startAt));
+      listEl.innerHTML = sorted.map(s => {
+        const sub = subMap[s.subjectId];
+        const secs = getSeconds(s);
+        return `
+          <div class="session-item" data-id="${s.id}">
+            <div class="session-item-left">
+              <span style="font-size:1rem; width:1.6em; text-align:center;">${sub?.emoji || '📝'}</span>
+              <span style="color:${sub?.color || 'var(--accent)'}; font-weight:600; font-size:0.88rem;">
+                ${sub?.name || '未知項目'}</span>
+              <span class="badge badge-${s.mode === 'pomodoro' ? 'blue' : 'gray'}">
+                ${s.mode === 'pomodoro' ? '🍅 番茄' : '⏱ 自由'}</span>
+            </div>
+            <div class="session-item-right">
+              <span style="font-size:0.82rem; color:var(--text-muted);">${formatDate(s.startAt)}</span>
+              <span style="font-size:0.85rem; font-weight:600;">${formatDuration(secs)}</span>
+              <button class="session-delete-btn" title="刪除此記錄" onclick="deleteSession('${s.id}')">🗑</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // 刪除單筆學習記錄
+    function deleteSession(id) {
+      if (!confirm('確定要刪除此學習記錄？')) return;
+      const all = loadData('st_sessions', []).filter(s => s.id !== id);
+      saveData('st_sessions', all);
+      drawCharts(); // 重繪
     }
 
     // 篩選 Tab 事件

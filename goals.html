@@ -65,17 +65,22 @@
       <span class="brand-icon">📚</span> Study Tracker
     </a>
     <ul class="nav-links">
-      <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
-      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="index.html"><span class="nav-icon">🏠</span> 主頁</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 學習項目</a></li>
       <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
       <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
       <li><a href="goals.html" class="active"><span class="nav-icon">🎯</span> 目標計畫</a></li>
       <li><a href="diary.html"><span class="nav-icon">📓</span> 日記</a></li>
       <li><a href="settings.html"><span class="nav-icon">⚙️</span> 設定</a></li>
     </ul>
-    <button class="nav-hamburger" aria-label="選單">
-      <span></span><span></span><span></span>
-    </button>
+    <div class="nav-right">
+      <div id="nav-user-avatar-wrap" style="display:none; cursor:pointer;" title="已登入" onclick="location.href='settings.html'">
+        <img id="nav-user-avatar" src="" alt="頭像" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.5);">
+      </div>
+      <button class="nav-hamburger" aria-label="選單">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </nav>
 
   <main>
@@ -114,9 +119,9 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">對應科目</label>
+        <label class="form-label">對應學習項目</label>
         <select class="form-select" id="f-subject">
-          <option value="">所有科目總計</option>
+          <option value="">所有學習項目總計</option>
         </select>
       </div>
 
@@ -199,7 +204,7 @@
 
       el.innerHTML = list.map(g => {
         const subLabel = g.subjectId
-          ? `${subMap[g.subjectId]?.emoji || ''} ${subMap[g.subjectId]?.name || '未知'}` : '所有科目';
+          ? `${subMap[g.subjectId]?.emoji || ''} ${subMap[g.subjectId]?.name || '未知'}` : '所有項目';
         const done   = calcProgress(g);
         const pct    = Math.min(100, Math.round((done / g.targetMinutes) * 100));
         const remain = Math.ceil((new Date(g.endDate) - new Date()) / 86400000);

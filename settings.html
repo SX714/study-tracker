@@ -123,17 +123,22 @@
       <span class="brand-icon">📚</span> Study Tracker
     </a>
     <ul class="nav-links">
-      <li><a href="index.html"><span class="nav-icon">🏠</span> 儀表板</a></li>
-      <li><a href="subjects.html"><span class="nav-icon">📖</span> 科目管理</a></li>
+      <li><a href="index.html"><span class="nav-icon">🏠</span> 主頁</a></li>
+      <li><a href="subjects.html"><span class="nav-icon">📖</span> 學習項目</a></li>
       <li><a href="timer.html"><span class="nav-icon">⏱️</span> 計時器</a></li>
       <li><a href="stats.html"><span class="nav-icon">📊</span> 統計圖表</a></li>
       <li><a href="goals.html"><span class="nav-icon">🎯</span> 目標計畫</a></li>
       <li><a href="diary.html"><span class="nav-icon">📓</span> 日記</a></li>
       <li><a href="settings.html" class="active"><span class="nav-icon">⚙️</span> 設定</a></li>
     </ul>
-    <button class="nav-hamburger" aria-label="選單">
-      <span></span><span></span><span></span>
-    </button>
+    <div class="nav-right">
+      <div id="nav-user-avatar-wrap" style="display:none; cursor:pointer;" title="已登入" onclick="location.href='settings.html'">
+        <img id="nav-user-avatar" src="" alt="頭像" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.5);">
+      </div>
+      <button class="nav-hamburger" aria-label="選單">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </nav>
 
   <main style="max-width: 640px;">
@@ -247,7 +252,7 @@
     <div class="settings-section">
       <div class="settings-section-title">☁️ 雲端同步</div>
       <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
-        使用 Google 帳號登入，讓科目、學習記錄、目標與日記在多台裝置間同步。
+        使用 Google 帳號登入，讓學習項目、學習記錄、目標與日記在多台裝置間同步。
         需先在 <code style="font-size:0.82rem; background:var(--bg); padding:2px 5px; border-radius:4px;">js/firebase-sync.js</code>
         設定你的 Firebase 專案金鑰。
       </p>
@@ -408,7 +413,7 @@
           const el = document.getElementById('import-result');
           if (imported > 0) {
             el.style.cssText = 'display:block; background:#dcfce7; color:#15803d;';
-            el.textContent = `✅ 成功匯入 ${imported} 項資料（科目、記錄、目標）。頁面將重新整理。`;
+            el.textContent = `✅ 成功匯入 ${imported} 項資料（學習項目、記錄、目標）。頁面將重新整理。`;
             setTimeout(() => location.reload(), 1500);
           } else {
             el.style.cssText = 'display:block; background:#fee2e2; color:#b91c1c;';
@@ -451,7 +456,7 @@
 
     // 清除所有資料
     document.getElementById('clear-all-btn').addEventListener('click', () => {
-      if (confirm('⚠️ 確定要清除所有資料（科目、記錄、目標、AI 對話）？此動作無法復原！')) {
+      if (confirm('⚠️ 確定要清除所有資料（學習項目、記錄、目標、AI 對話）？此動作無法復原！')) {
         ['st_subjects','st_sessions','st_goals','st_ai_history','st_ai_topics'].forEach(k =>
           localStorage.removeItem(k));
         alert('✅ 所有資料已清除，頁面將重新整理。');

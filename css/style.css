@@ -150,6 +150,13 @@ ul { list-style: none; }
 
 .nav-links a .nav-icon { font-size: 1rem; }
 
+/* 導覽列右側區塊（頭像 + 漢堡） */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* 漢堡選單按鈕（手機版） */
 .nav-hamburger {
   display: none;
