@@ -246,6 +246,7 @@
     let elapsed     = 0;   // 自由計時用（秒）
     let pomodoroRound = 0; // 已完成的番茄數（0-3）
     let sessionStart  = null;
+    let pomodoroWorkElapsed = 0; // 累積番茄 work 階段已計時秒數（含多次暫停）
     const sessionLog  = [];
 
     // 載入學習項目
@@ -327,6 +328,7 @@
         if (mode === 'free') {
           elapsed++;
         } else {
+          if (phase === 'work') pomodoroWorkElapsed++;
           remaining--;
           if (remaining <= 0) {
             clearInterval(intervalId);
@@ -346,16 +348,19 @@
     }
 
     function resetTimer() {
-      // 番茄鐘 work 階段：若已開始計時，把已過的時間儲存為未完成記錄
-      if (mode === 'pomodoro' && phase === 'work' && sessionStart) {
-        const elapsed_pomo = PHASES.work.minutes * 60 - remaining;
-        if (elapsed_pomo > 0) {
+      // 番茄鐘 work 階段：把累積已計時秒數（含所有暫停片段）儲存為未完成記錄
+      if (mode === 'pomodoro' && phase === 'work') {
+        // 若目前正在 running，把這段尚未累積進去的秒數也算進來
+        const inFlight = running ? (PHASES.work.minutes * 60 - remaining - pomodoroWorkElapsed) : 0;
+        const total = pomodoroWorkElapsed + inFlight;
+        if (total > 0) {
           const subjectId = sel.value;
-          if (subjectId) saveSession(elapsed_pomo, false);
+          if (subjectId) saveSession(total, false);
         }
       }
       pauseTimer();
       elapsed = 0;
+      pomodoroWorkElapsed = 0;
       remaining = PHASES[phase].minutes * 60;
       sessionStart = null;
       document.getElementById('start-btn').textContent = '▶ 開始';
@@ -454,6 +459,7 @@
     function onPomodoroPhaseEnd() {
       if (phase === 'work') {
         saveSession(PHASES.work.minutes * 60, true);
+        pomodoroWorkElapsed = 0; // 完整完成，重置累積秒數
         pomodoroRound++;
         if (pomodoroRound >= (settings.longBreakInterval || 4)) {
           pomodoroRound = 0;
@@ -525,8 +531,7 @@
           saveSession(secs, false);
           resetTimer();
         }
-      } else if (mode === 'pomodoro' && phase === 'work' && sessionStart &&
-                 PHASES.work.minutes * 60 - remaining > 0) {
+      } else if (mode === 'pomodoro' && phase === 'work' && pomodoroWorkElapsed > 0) {
         if (confirm('確定要重置？已計時的部分將儲存為一筆未完成記錄。')) {
           resetTimer(); // resetTimer 內部會自動儲存未完成秒數
         }
