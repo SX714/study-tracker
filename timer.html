@@ -346,6 +346,14 @@
     }
 
     function resetTimer() {
+      // 番茄鐘 work 階段：若已開始計時，把已過的時間儲存為未完成記錄
+      if (mode === 'pomodoro' && phase === 'work' && sessionStart) {
+        const elapsed_pomo = PHASES.work.minutes * 60 - remaining;
+        if (elapsed_pomo > 0) {
+          const subjectId = sel.value;
+          if (subjectId) saveSession(elapsed_pomo, false);
+        }
+      }
       pauseTimer();
       elapsed = 0;
       remaining = PHASES[phase].minutes * 60;
@@ -516,6 +524,11 @@
           const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
           saveSession(secs, false);
           resetTimer();
+        }
+      } else if (mode === 'pomodoro' && phase === 'work' && sessionStart &&
+                 PHASES.work.minutes * 60 - remaining > 0) {
+        if (confirm('確定要重置？已計時的部分將儲存為一筆未完成記錄。')) {
+          resetTimer(); // resetTimer 內部會自動儲存未完成秒數
         }
       } else {
         resetTimer();
