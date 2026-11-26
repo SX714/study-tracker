@@ -167,7 +167,7 @@
 
         <div class="timer-controls">
           <button class="btn btn-primary btn-lg" id="start-btn">▶ 開始</button>
-          <button class="btn btn-ghost btn-lg" id="stop-free-btn" style="display:none;">⏹ 停止並儲存</button>
+          <button class="btn btn-success btn-lg" id="save-btn" style="display:none;">💾 計入時數</button>
           <button class="btn btn-ghost btn-lg" id="reset-btn">↺ 重置</button>
         </div>
       </div>
@@ -284,11 +284,9 @@
       mode = m;
       document.querySelectorAll('.mode-tab').forEach(t =>
         t.classList.toggle('active', t.dataset.mode === m));
-      resetTimer();
+      resetTimer(); // 也會隱藏 save-btn
       document.getElementById('pomodoro-dots').style.display =
         m === 'pomodoro' ? 'flex' : 'none';
-      document.getElementById('stop-free-btn').style.display =
-        m === 'free' ? 'inline-flex' : 'none';
       if (m === 'free') {
         document.getElementById('phase-label').textContent = '⏱ 自由計時';
         document.getElementById('timer-display').textContent = '00:00:00';
@@ -348,16 +346,6 @@
     }
 
     function resetTimer() {
-      // 番茄鐘 work 階段：把累積已計時秒數（含所有暫停片段）儲存為未完成記錄
-      if (mode === 'pomodoro' && phase === 'work') {
-        // 若目前正在 running，把這段尚未累積進去的秒數也算進來
-        const inFlight = running ? (PHASES.work.minutes * 60 - remaining - pomodoroWorkElapsed) : 0;
-        const total = pomodoroWorkElapsed + inFlight;
-        if (total > 0) {
-          const subjectId = sel.value;
-          if (subjectId) saveSession(total, false);
-        }
-      }
       pauseTimer();
       elapsed = 0;
       pomodoroWorkElapsed = 0;
@@ -366,7 +354,28 @@
       document.getElementById('start-btn').textContent = '▶ 開始';
       document.getElementById('start-btn').classList.remove('btn-warning');
       document.getElementById('start-btn').classList.add('btn-primary');
+      document.getElementById('save-btn').style.display = 'none';
       updateDisplay();
+    }
+
+    // 計算目前累積秒數（含正在計時中尚未累積的部分）
+    function getCurrentElapsedSeconds() {
+      if (mode === 'free') return elapsed;
+      // pomodoro work 階段：pomodoroWorkElapsed + 目前這段尚未 tick 進去的不用算，
+      // 因為每秒都即時累積進 pomodoroWorkElapsed 了
+      return pomodoroWorkElapsed;
+    }
+
+    // 儲存目前累積時數並重置
+    function saveAndReset() {
+      const subjectId = sel.value;
+      if (!subjectId) { alert('請先選擇學習項目！'); return; }
+      const secs = getCurrentElapsedSeconds();
+      if (secs < 1) { alert('尚未開始計時'); return; }
+      const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
+      saveSession(secs, false);
+      resetTimer();
+      openDiaryModal(subjectId, subName, secs);
     }
 
     // ── 日記 Modal ──────────────────────────────────────
@@ -507,38 +516,20 @@
 
     // 按鈕事件
     document.getElementById('start-btn').addEventListener('click', () => {
-      running ? pauseTimer() : startTimer();
-    });
-
-    // 自由計時「停止並儲存」按鈕
-    document.getElementById('stop-free-btn').addEventListener('click', () => {
-      if (elapsed < 1) { alert('尚未開始計時'); return; }
-      const subjectId = sel.value;
-      if (!subjectId) { alert('請先選擇學習項目！'); return; }
-      const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
-      const secs = elapsed;
-      saveSession(secs, true);
-      resetTimer();
-      openDiaryModal(subjectId, subName, secs);
-    });
-
-    document.getElementById('reset-btn').addEventListener('click', () => {
-      if (mode === 'free' && elapsed > 0) {
-        if (confirm('確定要重置？目前計時將儲存為一筆記錄。')) {
-          const secs = elapsed;
-          const subjectId = sel.value;
-          const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
-          saveSession(secs, false);
-          resetTimer();
-        }
-      } else if (mode === 'pomodoro' && phase === 'work' && pomodoroWorkElapsed > 0) {
-        if (confirm('確定要重置？已計時的部分將儲存為一筆未完成記錄。')) {
-          resetTimer(); // resetTimer 內部會自動儲存未完成秒數
-        }
+      if (running) {
+        pauseTimer();
       } else {
-        resetTimer();
+        startTimer();
+        // 開始計時後顯示「計入時數」按鈕
+        document.getElementById('save-btn').style.display = 'inline-flex';
       }
     });
+
+    // 「💾 計入時數」按鈕
+    document.getElementById('save-btn').addEventListener('click', saveAndReset);
+
+    // 重置：純粹清零，不儲存任何記錄
+    document.getElementById('reset-btn').addEventListener('click', resetTimer);
 
     // 離頁提示：計時進行中時警告
     window.addEventListener('beforeunload', e => {
