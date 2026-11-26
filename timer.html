@@ -252,7 +252,8 @@
     let pomodoroRound = 0; // 已完成的番茄數（0-3）
     let sessionStart  = null;
     let pomodoroWorkElapsed = 0; // 累積番茄 work 階段已計時秒數（含多次暫停）
-    const sessionLog  = [];
+    const sessionLog    = [];
+    const pendingDiaries = []; // 等待填寫內容的記錄，按「計入時數」後統一彈出
 
     // 載入學習項目
     const subjects = loadData('st_subjects', []);
@@ -269,7 +270,7 @@
     if (params.get('subject')) sel.value = params.get('subject');
     if (params.get('mode') === 'free') switchMode('free');
 
-    // ── 日記 Modal 佇列（切換項目時可能同時有多筆）──────
+    // ── 日記 Modal 佇列（按「計入時數」或番茄完成後逐筆彈出）──────
     const diaryQueue = [];
     let diaryQueueRunning = false;
 
@@ -283,35 +284,33 @@
       diaryQueueRunning = true;
       const next = diaryQueue.shift();
       openDiaryModal(next.subjectId, next.subName, next.durationSeconds);
-      // 當 modal 關閉後（儲存或跳過）繼續下一筆，見 closeDiaryModal
     }
 
-    // 切換學習項目：先把前一個項目的已計時秒數切分儲存，再重設計時開始新項目
+    // 切換學習項目：只切分儲存 session，不彈 modal，等按「計入時數」後再一起填
     sel.addEventListener('change', () => {
       const prevSubjectId = sel._prevValue;
       const secs = mode === 'free' ? elapsed : pomodoroWorkElapsed;
 
       if (prevSubjectId && secs > 0) {
-        // 儲存前一個項目的已計時秒數
         const wasRunning = running;
         if (wasRunning) pauseTimer();
 
         const prevSubName = subjects.find(s => s.id === prevSubjectId)?.name || '未知';
-        // 直接寫入 session（不走 saveSession 以免讀到已更新的 sel.value）
-        const durationMinutes = secs / 60;
+        // 直接寫入 session（不經 saveSession，避免讀到已更新的 sel.value）
         const session = {
           id: generateId(), subjectId: prevSubjectId, mode,
           startAt: (sessionStart || new Date()).toISOString(),
-          durationSeconds: secs, durationMinutes, completed: false
+          durationSeconds: secs, durationMinutes: secs / 60, completed: false
         };
         const sessions = loadData('st_sessions', []);
         sessions.push(session);
         saveData('st_sessions', sessions);
         sessionLog.push({ subName: prevSubName, durationSeconds: secs, mode, completed: false });
         renderSessionLog();
-        enqueueDiary(prevSubjectId, prevSubName, secs);
+        // ★ 不在這裡 enqueueDiary，改存到 pendingDiaries 等最後一起彈
+        pendingDiaries.push({ subjectId: prevSubjectId, subName: prevSubName, durationSeconds: secs });
 
-        // 重置計時器數值，繼續用相同狀態（running/pause）給新項目
+        // 重置計時器數值，繼續給新項目計時
         elapsed = 0;
         pomodoroWorkElapsed = 0;
         sessionStart = new Date();
@@ -416,16 +415,24 @@
       return pomodoroWorkElapsed;
     }
 
-    // 儲存目前累積時數並重置
+    // 儲存目前累積時數並重置，然後把所有待填的記錄一起排隊彈出
     function saveAndReset() {
       const subjectId = sel.value;
       if (!subjectId) { alert('請先選擇學習項目！'); return; }
       const secs = getCurrentElapsedSeconds();
-      if (secs < 1) { alert('尚未開始計時'); return; }
+      if (secs < 1 && pendingDiaries.length === 0) { alert('尚未開始計時'); return; }
       const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
-      saveSession(secs, false);
+
+      // 儲存當前項目（若有計時）
+      if (secs > 0) {
+        saveSession(secs, false);
+        pendingDiaries.push({ subjectId, subName, durationSeconds: secs });
+      }
       resetTimer();
-      enqueueDiary(subjectId, subName, secs);
+
+      // 把所有待填日記一次加入佇列
+      pendingDiaries.forEach(d => enqueueDiary(d.subjectId, d.subName, d.durationSeconds));
+      pendingDiaries.length = 0;
     }
 
     // ── 日記 Modal ──────────────────────────────────────
@@ -511,9 +518,9 @@
       sessionLog.push({ subName, durationSeconds, mode, completed });
       renderSessionLog();
 
-      // 計時完成後加入日記佇列
+      // 番茄完成：加入待填清單，等使用者按「計入時數」時統一彈出
       if (completed) {
-        enqueueDiary(subjectId, subName, durationSeconds);
+        pendingDiaries.push({ subjectId, subName, durationSeconds });
       }
     }
 
