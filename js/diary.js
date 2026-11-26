@@ -173,6 +173,25 @@
   buildSubjectFilter();
   render();
 
+  // 清除全部日記
+  document.getElementById('clear-all-diary-btn').addEventListener('click', () => {
+    const diary = loadData('st_diary', []);
+    // 若有篩選，只清除篩選科目的；否則清除全部
+    const target = filterSubjectId
+      ? diary.filter(e => e.subjectId === filterSubjectId)
+      : diary;
+    if (target.length === 0) return;
+    const label = filterSubjectId
+      ? `確定要清除此學習項目的所有日記（共 ${target.length} 筆）？此動作無法復原。`
+      : `確定要清除所有日記（共 ${target.length} 筆）？此動作無法復原。`;
+    if (!confirm(label)) return;
+    const kept = filterSubjectId
+      ? diary.filter(e => e.subjectId !== filterSubjectId)
+      : [];
+    saveData('st_diary', kept);
+    render();
+  });
+
   // 編輯 Modal 星星
   document.querySelectorAll('#edit-mood-stars .mood-score-btn').forEach(btn => {
     btn.addEventListener('click', () => updateEditMoodScore(Number(btn.dataset.val)));

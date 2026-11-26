@@ -186,7 +186,11 @@
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
           <div class="card-title" style="margin-bottom:0">📝 學習記錄明細</div>
-          <span id="sessions-count" style="font-size:0.82rem; color:var(--text-muted);"></span>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span id="sessions-count" style="font-size:0.82rem; color:var(--text-muted);"></span>
+            <button class="btn btn-ghost btn-sm" id="clear-all-sessions-btn"
+                    style="color:var(--danger);">🗑 清除全部</button>
+          </div>
         </div>
         <div id="sessions-list"></div>
       </div>
@@ -401,8 +405,17 @@
       if (!confirm('確定要刪除此學習記錄？')) return;
       const all = loadData('st_sessions', []).filter(s => s.id !== id);
       saveData('st_sessions', all);
-      drawCharts(); // 重繪
+      drawCharts();
     }
+
+    document.getElementById('clear-all-sessions-btn').addEventListener('click', () => {
+      if (!confirm('確定要清除此區間所有學習記錄？此動作無法復原。')) return;
+      // 只刪除目前篩選區間內的記錄，區間外的保留
+      const remaining = loadData('st_sessions', [])
+        .filter(s => !isInRange(s.startAt.slice(0, 10), rangeStart, rangeEnd));
+      saveData('st_sessions', remaining);
+      drawCharts();
+    });
 
     // 篩選 Tab 事件
     document.querySelectorAll('.filter-tab').forEach(tab => {
