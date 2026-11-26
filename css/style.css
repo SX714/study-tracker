@@ -53,8 +53,6 @@ body.dark .test-result.error   { background: #450a0a; color: #fca5a5; }
 /* diary 深色覆蓋 */
 body.dark .diary-card          { background: #1a2535; border-color: #2d3f55; }
 body.dark .diary-date-group h3 { color: #94a3b8; border-color: #2d3f55; }
-body.dark .diary-mood-star.filled { color: #fbbf24; }
-body.dark .diary-mood-star     { color: #374357; }
 body.dark .diary-summary       { background: #0f1923; color: #94a3b8; }
 
 /* ===========================
@@ -559,28 +557,39 @@ footer {
   font-size: 0.95rem;
 }
 
-/* 心情星星評分 */
-.mood-stars {
+/* 進度滿意度 1~10 數字按鈕 */
+.mood-score {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
-.mood-star {
-  font-size: 1.6rem;
+.mood-score-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
-  color: var(--border);
-  transition: color var(--transition), transform var(--transition);
-  line-height: 1;
-  background: none;
-  border: none;
-  padding: 0;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition), transform var(--transition);
 }
 
-.mood-star:hover,
-.mood-star.active {
-  color: #f59e0b;
-  transform: scale(1.15);
+.mood-score-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(1.1);
+}
+
+.mood-score-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  transform: scale(1.1);
 }
 
 /* 日記頁面：日期分組 */
@@ -633,16 +642,19 @@ footer {
 
 .diary-card-mood {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
 }
 
-.diary-mood-star {
-  font-size: 1rem;
-  color: var(--border);
-}
-
-.diary-mood-star.filled {
-  color: #f59e0b;
+/* 日記卡片分數標籤 */
+.diary-score-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--text-muted);
 }
 
 .diary-card-content {

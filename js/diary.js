@@ -13,7 +13,7 @@
 
   // ── 編輯狀態 ───────────────────────────────
   let editingId = null;
-  let editMood  = 3;
+  let editMood  = 5;
 
   // ── 工具函式 ───────────────────────────────
   function formatDate(isoStr) {
@@ -30,10 +30,10 @@
     return isoStr.slice(0, 10); // YYYY-MM-DD
   }
 
-  function moodStarsHtml(mood, total = 5) {
-    return Array.from({ length: total }, (_, i) =>
-      `<span class="diary-mood-star${i < mood ? ' filled' : ''}">★</span>`
-    ).join('');
+  function moodScoreHtml(mood) {
+    if (!mood) return '<span class="diary-score-badge">—</span>';
+    const color = mood >= 8 ? '#22c55e' : mood >= 5 ? '#f59e0b' : '#ef4444';
+    return `<span class="diary-score-badge" style="background:${color};">${mood} 分</span>`;
   }
 
   // ── 科目篩選下拉建立 ───────────────────────
@@ -119,7 +119,7 @@
           <span class="diary-card-subject">${subName}</span>
           <span class="diary-card-time">${formatTime(entry.createdAt)}</span>
         </div>
-        <div class="diary-card-mood">${moodStarsHtml(entry.mood || 0)}</div>
+        <div class="diary-card-mood">${moodScoreHtml(entry.mood)}</div>
         ${content}
         <div class="diary-card-actions">
           <button class="btn btn-ghost btn-sm diary-edit-btn" data-id="${entry.id}">✏️ 編輯</button>
@@ -147,13 +147,13 @@
     const entry = diary.find(e => e.id === id);
     if (!entry) return;
     editingId = id;
-    editMood  = entry.mood || 3;
+    editMood  = entry.mood || 5;
 
     const sub = subjectMap[entry.subjectId];
     document.getElementById('edit-diary-title').textContent =
       sub ? `✏️ 編輯日記 — ${sub.emoji || ''} ${sub.name}` : '✏️ 編輯日記';
     document.getElementById('edit-diary-content').value = entry.content || '';
-    updateEditMoodStars(editMood);
+    updateEditMoodScore(editMood);
     document.getElementById('edit-diary-modal').classList.add('open');
   }
 
@@ -162,10 +162,10 @@
     editingId = null;
   }
 
-  function updateEditMoodStars(val) {
+  function updateEditMoodScore(val) {
     editMood = val;
-    document.querySelectorAll('#edit-mood-stars .mood-star').forEach(btn => {
-      btn.classList.toggle('active', Number(btn.dataset.val) <= val);
+    document.querySelectorAll('#edit-mood-stars .mood-score-btn').forEach(btn => {
+      btn.classList.toggle('active', Number(btn.dataset.val) === val);
     });
   }
 
@@ -174,8 +174,8 @@
   render();
 
   // 編輯 Modal 星星
-  document.querySelectorAll('#edit-mood-stars .mood-star').forEach(btn => {
-    btn.addEventListener('click', () => updateEditMoodStars(Number(btn.dataset.val)));
+  document.querySelectorAll('#edit-mood-stars .mood-score-btn').forEach(btn => {
+    btn.addEventListener('click', () => updateEditMoodScore(Number(btn.dataset.val)));
   });
 
   // 關閉編輯 Modal
