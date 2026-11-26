@@ -269,16 +269,60 @@
     if (params.get('subject')) sel.value = params.get('subject');
     if (params.get('mode') === 'free') switchMode('free');
 
-    // 切換學習項目時，若番茄在進行中詢問是否重置
+    // ── 日記 Modal 佇列（切換項目時可能同時有多筆）──────
+    const diaryQueue = [];
+    let diaryQueueRunning = false;
+
+    function enqueueDiary(subjectId, subName, durationSeconds) {
+      diaryQueue.push({ subjectId, subName, durationSeconds });
+      if (!diaryQueueRunning) flushDiaryQueue();
+    }
+
+    function flushDiaryQueue() {
+      if (diaryQueue.length === 0) { diaryQueueRunning = false; return; }
+      diaryQueueRunning = true;
+      const next = diaryQueue.shift();
+      openDiaryModal(next.subjectId, next.subName, next.durationSeconds);
+      // 當 modal 關閉後（儲存或跳過）繼續下一筆，見 closeDiaryModal
+    }
+
+    // 切換學習項目：先把前一個項目的已計時秒數切分儲存，再重設計時開始新項目
     sel.addEventListener('change', () => {
-      if (mode === 'pomodoro' && running) {
-        const restart = confirm('切換學習項目，是否重新開始目前的番茄鐘？\n\n【確定】重新開始　【取消】繼續計時（只換項目）');
-        if (restart) {
-          resetTimer();
-        }
-        // 無論如何都允許換項目，resetTimer 會 pause 而不是阻止切換
+      const prevSubjectId = sel._prevValue;
+      const secs = mode === 'free' ? elapsed : pomodoroWorkElapsed;
+
+      if (prevSubjectId && secs > 0) {
+        // 儲存前一個項目的已計時秒數
+        const wasRunning = running;
+        if (wasRunning) pauseTimer();
+
+        const prevSubName = subjects.find(s => s.id === prevSubjectId)?.name || '未知';
+        // 直接寫入 session（不走 saveSession 以免讀到已更新的 sel.value）
+        const durationMinutes = secs / 60;
+        const session = {
+          id: generateId(), subjectId: prevSubjectId, mode,
+          startAt: (sessionStart || new Date()).toISOString(),
+          durationSeconds: secs, durationMinutes, completed: false
+        };
+        const sessions = loadData('st_sessions', []);
+        sessions.push(session);
+        saveData('st_sessions', sessions);
+        sessionLog.push({ subName: prevSubName, durationSeconds: secs, mode, completed: false });
+        renderSessionLog();
+        enqueueDiary(prevSubjectId, prevSubName, secs);
+
+        // 重置計時器數值，繼續用相同狀態（running/pause）給新項目
+        elapsed = 0;
+        pomodoroWorkElapsed = 0;
+        sessionStart = new Date();
+        if (wasRunning) startTimer();
       }
+
+      sel._prevValue = sel.value;
     });
+
+    // 初始化 _prevValue（URL 預選後才設定）
+    sel._prevValue = sel.value;
 
     // 模式切換 Tab
     document.querySelectorAll('.mode-tab').forEach(tab => {
@@ -356,6 +400,7 @@
       pomodoroWorkElapsed = 0;
       remaining = PHASES[phase].minutes * 60;
       sessionStart = null;
+      sel._prevValue = sel.value; // 重置後同步 _prevValue，避免下次切換重複計算
       document.getElementById('start-btn').textContent = '▶ 開始';
       document.getElementById('start-btn').classList.remove('btn-warning');
       document.getElementById('start-btn').classList.add('btn-primary');
@@ -380,7 +425,7 @@
       const subName = subjects.find(s => s.id === subjectId)?.name || '未知';
       saveSession(secs, false);
       resetTimer();
-      openDiaryModal(subjectId, subName, secs);
+      enqueueDiary(subjectId, subName, secs);
     }
 
     // ── 日記 Modal ──────────────────────────────────────
@@ -408,6 +453,8 @@
     function closeDiaryModal() {
       document.getElementById('diary-modal').classList.remove('open');
       pendingDiarySession = null;
+      // 若佇列還有下一筆，繼續彈出
+      flushDiaryQueue();
     }
 
     function updateMoodScore(val) {
@@ -464,9 +511,9 @@
       sessionLog.push({ subName, durationSeconds, mode, completed });
       renderSessionLog();
 
-      // 計時完成後彈出日記 Modal
+      // 計時完成後加入日記佇列
       if (completed) {
-        openDiaryModal(subjectId, subName, durationSeconds);
+        enqueueDiary(subjectId, subName, durationSeconds);
       }
     }
 
